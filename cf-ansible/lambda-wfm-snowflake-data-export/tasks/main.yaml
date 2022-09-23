@@ -1,0 +1,17 @@
+---
+
+- name: Rendering WFM Snowflake data export Lambda template
+  template: src=lambda-wfm-snowflake-data-export.yml.j2 dest={{workspace}}/{{template}}
+  tags:
+    - render_lambda_template
+
+- include: roles/lambda-functions/tasks/archive-npm-sources.yaml
+  when: stack_state == "present"
+
+- include: roles/lambda-functions/tasks/upload-lambda-zip.yaml
+  when: stack_state == "present"
+
+- include: roles/upload-template-s3/tasks/upload-template-to-s3.yaml
+  when: stack_state == "present"
+
+- include: roles/deploy-cf-template/tasks/main.yaml

@@ -1,0 +1,33 @@
+{
+  "name": "lambda-datalake-incontact-adherence",
+  "version": "1.0.0",
+  "description": "Your AWS Lambda description goes here",
+  "main": "index.js",
+  "scripts": {
+    "test": "jenkins-mocha --cobertura test/*",
+    "testlocal": "mocha ./test/*.js",
+    "integration-test": "jenkins-mocha integrationTest/*"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.4.7",
+    "lambda-common-utils": "1.16.0",
+    "moment": "^2.17.1",
+    "object-sizeof": "^1.2.0",
+    "request": "^2.79.0",
+    "request-promise": "^4.2.2",
+    "promise.allsettled": "^1.0.2"
+  },
+  "devDependencies": {
+    "aws-sdk": "^2.7.20",
+    "aws-sdk-mock": "^1.7.0",
+    "chai": "^3.5.0",
+    "clone": "^2.1.2",
+    "jenkins-mocha": "^8.0.0",
+    "lambda-tester": "^4.0.1",
+    "mocha": "^7.0.0",
+    "rewire": "^2.5.2",
+    "sinon": "2.4.1"
+  }
+}

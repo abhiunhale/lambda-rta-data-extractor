@@ -1,0 +1,244 @@
+#jinja2:lstrip_blocks:False,trim_blocks:False
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: WFM Snowflake Data Export Lambda, revision={{revision}}
+
+Conditions:
+  LowEnvConcurrency: !Or
+    - !Equals
+      - !Ref 'EnvironmentType'
+      - dev
+    - !Equals
+      - !Ref 'EnvironmentType'
+      - test
+    - !Equals
+      - !Ref 'EnvironmentType'
+      - perf
+
+Parameters:
+  EnvironmentType:
+      Description: The environment type. All resources will be created with environment type prefix
+      Type: String
+      Default: {{stack_prefix}}
+
+  SourceCodeBucket:
+      Description: S3 bucket with lambda source code
+      Type: String
+      Default: {{cf_bucket}}
+
+  WFMILSNSTopic:
+        Description: 'WFM Internal SNS Topic ConcurrentExecutions and Throttle Alarm'
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: '/{{stack_prefix}}/aws/sns/WFMILTeamDLSNSTopic'
+
+  WFMDLConsumersSNSTopic:
+        Description: "{{profile}} SNS Topic for WFM DataLake Team"
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: '/{{profile}}/aws/sns/WFMDLConsumersSNSTopic'
+
+  BmcInfoAlarmTopic:
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: /{{profile}}/aws/sns/topic/bmc-info-alarm-topic
+        Description: The arn of Bmc info alarm sns topic.
+
+  BmcCriticalAlarmTopic:
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: /{{profile}}/aws/sns/topic/bmc-critical-alarm-topic
+        Description: The arn of Bmc critical alarm sns topic
+
+  LowConcurrency:
+      Type: String
+      Default: 80
+
+  ProductionConcurrency:
+      Type: String
+      Default: 150
+
+  DevopsContactInformationSSM:
+      Description: 'Devops team contact information'
+      Type: 'AWS::SSM::Parameter::Value<String>'
+      Default: '/{{profile}}/aws/contactinformation/devops'
+
+  WfmContactInformationSSM:
+      Description: 'WFM Team contact information'
+      Type: 'AWS::SSM::Parameter::Value<String>'
+      Default: '/{{profile}}/aws/contactinformation/wfm'
+
+
+Resources:
+
+ WFMSnowflakeDataExportLambdaRole:
+     Type: AWS::IAM::Role
+     Properties:
+         RoleName: {{lambda_name}}-role
+         AssumeRolePolicyDocument:
+             Version: "2012-10-17"
+             Statement:
+                 -
+                     Effect: Allow
+                     Principal:
+                         Service:
+                             - lambda.amazonaws.com
+                     Action:
+                         - sts:AssumeRole
+         ManagedPolicyArns:
+             - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+             - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+         Policies:
+             -
+                 PolicyName: WFMSnowflakeDataExportPolicyLambdaKinesisDynamodbAccess
+                 PolicyDocument:
+                     Version: "2012-10-17"
+                     Statement:
+                         -
+                             Effect: Allow
+                             Action:
+                                 - kinesis:*
+                                 - dynamodb:*
+                                 - s3:*
+                                 - cloudwatch:*
+                             Resource:
+                                 - "*"
+
+ WFMSnowflakeExportDataFunction:
+     Type: AWS::Lambda::Function
+     DependsOn:
+         - WFMSnowflakeDataExportLambdaRole
+     Properties:
+         FunctionName:   {{lambda_name}}
+         Description:    "export wfm data from snowflake and upload to S3"
+         Handler:        src/index.handler
+         Runtime:        nodejs16.x
+         Timeout:        900
+         MemorySize:     1024
+         Role:           !GetAtt WFMSnowflakeDataExportLambdaRole.Arn
+         ReservedConcurrentExecutions:
+             Fn::If:
+               - LowEnvConcurrency
+               - !Ref LowConcurrency
+               - !Ref ProductionConcurrency
+         VpcConfig:
+             SecurityGroupIds:
+               {% for sg in sec_groups -%}
+                 - {{sg}}
+               {% endfor %}
+             SubnetIds:
+               {% for sb in subnets -%}
+                 - {{sb}}
+               {% endfor %}
+         Environment:
+             Variables:
+                 AWS_PROFILE:     "{{stack_prefix}}"
+                 DEBUG:        "true"
+                 SEND_TO_NEW_DL_STREAM:        "true"
+         Code:
+             S3Bucket: !Ref SourceCodeBucket
+             S3Key:    "{{s3_directory}}/{{lambda_archive}}"
+         Tags:
+             -
+                 Key: nice:owner
+                 Value: wfm
+             -
+                 Key: Name
+                 Value: {{lambda_name}}
+             -
+                 Key: Product
+                 Value: WFM
+             -
+                 Key: Service
+                 Value: datalake-incontact-adherence
+             -
+                 Key: Environment
+                 Value: !Ref EnvironmentType
+             -
+                 Key: ApplicationOwner
+                 Value: !Ref WfmContactInformationSSM
+             -
+                 Key: InfrastructureOwner
+                 Value: !Ref DevopsContactInformationSSM
+
+ WFMSnowflakeDataExportCWRule:
+     Type: AWS::Events::Rule
+     DependsOn:
+             - WFMSnowflakeExportDataFunction
+     Properties:
+         Description:        "Schedule Rule for Adherence Data export Lambda"
+         Name:               "{{stack_prefix}}-WFMSnowflakeDataExportCWRule1"
+         ScheduleExpression: "rate(30 minutes)"
+         State:              "ENABLED"
+         Targets:
+         -
+            Arn:  !ImportValue {{stack_prefix}}-TenantIteratorFunctionArn
+            Id:   DatalakeIncontactAdherenceDataFunctionV1
+            Input: "{\"lambdaNameToExecute\":\"{{lambda_name}}\",\"uri\":\"tenant?application=wfm&settings=wfm_acd_integration:ic&sensitive=true\",\"uri_new\":\"tenants/basicInfo?application=wfm&settings=wfm_acd_integration:ic\",\"tenants_filter_off_ft\":\"utility-wfm-AdherenceICDataFeed-CXWFM-22696\"}"
+
+ PermissionForEventsToInvokeTenantIteratorForRtaDataCollectionLambda:
+     Type: "AWS::Lambda::Permission"
+     Properties:
+         FunctionName: !ImportValue {{stack_prefix}}-TenantIteratorFunctionArn
+         Action:       "lambda:InvokeFunction"
+         Principal:    "events.amazonaws.com"
+         SourceArn:    !GetAtt  DatalakeIncontactAdherenceCWRule.Arn
+
+ WarningConcurrentExecutionsAlarm:
+   Type: AWS::CloudWatch::Alarm
+   Properties:
+     AlarmDescription: Warning concurrentExecution alarm for lambda.
+     AlarmName: {{profile}}-CEW-lambda-wfm-data-export
+     Namespace: AWS/Lambda
+     MetricName: ConcurrentExecutions
+     Dimensions:
+     - Name: FunctionName
+       Value: {{lambda_name}}
+     Statistic: Maximum
+     Period: '60'
+     EvaluationPeriods: '1'
+     Threshold: 120
+     TreatMissingData: notBreaching
+     ComparisonOperator: GreaterThanOrEqualToThreshold
+     AlarmActions:
+     -  !Ref WFMDLConsumersSNSTopic
+
+
+ CriticalConcurrentExecutionsAlarm:
+   Type: AWS::CloudWatch::Alarm
+   Properties:
+     AlarmDescription: concurrentExecution critical alarm for lambda.
+     AlarmName: {{profile}}-CEC-lambda-incontact-adherence
+     Namespace: AWS/Lambda
+     MetricName: ConcurrentExecutions
+     Dimensions:
+     - Name: FunctionName
+       Value: {{lambda_name}}
+     Statistic: Maximum
+     Period: '60'
+     EvaluationPeriods: '1'
+     Threshold: 135
+     TreatMissingData: notBreaching
+     ComparisonOperator: GreaterThanOrEqualToThreshold
+     AlarmActions:
+     -  !Ref WFMDLConsumersSNSTopic
+     -  !ImportValue
+       Fn::Sub: {{stack_prefix}}-BMCCriticalAlarmTopic
+
+ ThrottleAlarm:
+   Type: AWS::CloudWatch::Alarm
+   Properties:
+     AlarmDescription: Throttle alarm for lambda.
+     AlarmName: {{profile}}-throttle-wfm-data-export
+     Namespace: AWS/Lambda
+     MetricName: Throttles
+     Dimensions:
+     - Name: FunctionName
+       Value: {{lambda_name}}
+     Statistic: Maximum
+     Period: '60'
+     EvaluationPeriods: '1'
+     Threshold: 150
+     TreatMissingData: notBreaching
+     ComparisonOperator: GreaterThanOrEqualToThreshold
+     AlarmActions:
+     -  !Ref WFMDLConsumersSNSTopic
+     -  !ImportValue
+       Fn::Sub: {{stack_prefix}}-BMCCriticalAlarmTopic
