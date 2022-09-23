@@ -1,0 +1,19 @@
+.settings/
+target/
+.project
+.classpath
+velocity.log
+.idea/*
+*.iml
+/.project
+
+#-- integration tests ignore paths --
+**/integration-tests/lib/
+**/integration-tests/log/
+**/integration-tests/.ant.properties
+**/integration-tests/.run.properties
+**/integration-tests/.testdir.tmp
+**/integration-tests/jsystem.properties
+**/integration-tests/jsystem.properties.bu
+**/integration-tests/runnerState.properties
+**/integration-tests/src/main/java/jsystemProject.properties
