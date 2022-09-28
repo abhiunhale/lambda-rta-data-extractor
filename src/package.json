@@ -1,7 +1,7 @@
 {
   "name": "lambda-datalake-incontact-adherence",
   "version": "1.0.0",
-  "description": "Your AWS Lambda description goes here",
+  "description": "Lambda to export wfm data from snowflake",
   "main": "index.js",
   "scripts": {
     "test": "jenkins-mocha --cobertura test/*",
