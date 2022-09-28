@@ -27,10 +27,19 @@ Parameters:
       Type: String
       Default: {{cf_bucket}}
 
-  WFMILSNSTopic:
-        Description: 'WFM Internal SNS Topic ConcurrentExecutions and Throttle Alarm'
+  WFMExportSFDataGatewayName:
+        Description: 'WFM Snowflake data export gateway'
         Type: 'AWS::SSM::Parameter::Value<String>'
-        Default: '/{{stack_prefix}}/aws/sns/WFMILTeamDLSNSTopic'
+        Default: '/{{profile}}/aws/apigateway/WFMSFDataExport'
+
+  WFMExportSFDataGatewayStageName:
+        Description: 'WFM Snowflake data export gateway stage'
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: '{{stack_prefix}}'
+
+  WFMExportSFDataGatewayHTTPMethod:
+    Type: String
+    Default: POST
 
   WFMDLConsumersSNSTopic:
         Description: "{{profile}} SNS Topic for WFM DataLake Team"
@@ -67,6 +76,54 @@ Parameters:
 
 
 Resources:
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: WFM SF data export gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Ref WFMExportSFDataGatewayName
+
+  apiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt apiGateway.RootResourceId
+
+  apiGatewayRootMethod:
+      Type: AWS::ApiGateway::Method
+      Properties:
+        AuthorizationType: NONE
+        HttpMethod: !Ref WFMExportSFDataGatewayHTTPMethod
+        Integration:
+          IntegrationHttpMethod: POST
+          Type: AWS
+          Uri: !Sub
+            - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+            - lambdaArn: !GetAtt WFMSnowflakeExportDataFunction.Arn
+          IntegrationResponses:
+            - StatusCode: "200"
+        MethodResponses:
+          - StatusCode: "200"
+        ResourceId: !Ref apiGatewayResource
+        RestApiId: !Ref apiGateway
+
+  apiGatewayDeployment:
+      Type: AWS::ApiGateway::Deployment
+      DependsOn:
+        - apiGatewayRootMethod
+      Properties:
+        RestApiId: !Ref apiGateway
+        StageName: !Ref EnvironmentType
+
+  lambdaApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/
 
  WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
@@ -80,6 +137,8 @@ Resources:
                      Principal:
                          Service:
                              - lambda.amazonaws.com
+                             - events.amazonaws.com
+                             - s3.amazonaws.com
                      Action:
                          - sts:AssumeRole
          ManagedPolicyArns:
@@ -87,15 +146,13 @@ Resources:
              - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
          Policies:
              -
-                 PolicyName: WFMSnowflakeDataExportPolicyLambdaKinesisDynamodbAccess
+                 PolicyName: WFMSnowflakeDataExportPolicyLambdaGatewayS3Access
                  PolicyDocument:
                      Version: "2012-10-17"
                      Statement:
                          -
                              Effect: Allow
                              Action:
-                                 - kinesis:*
-                                 - dynamodb:*
                                  - s3:*
                                  - cloudwatch:*
                              Resource:
@@ -131,7 +188,6 @@ Resources:
              Variables:
                  AWS_PROFILE:     "{{stack_prefix}}"
                  DEBUG:        "true"
-                 SEND_TO_NEW_DL_STREAM:        "true"
          Code:
              S3Bucket: !Ref SourceCodeBucket
              S3Key:    "{{s3_directory}}/{{lambda_archive}}"
@@ -147,7 +203,7 @@ Resources:
                  Value: WFM
              -
                  Key: Service
-                 Value: datalake-incontact-adherence
+                 Value: wfm-snowflake-data-export
              -
                  Key: Environment
                  Value: !Ref EnvironmentType
@@ -158,87 +214,8 @@ Resources:
                  Key: InfrastructureOwner
                  Value: !Ref DevopsContactInformationSSM
 
- WFMSnowflakeDataExportCWRule:
-     Type: AWS::Events::Rule
-     DependsOn:
-             - WFMSnowflakeExportDataFunction
-     Properties:
-         Description:        "Schedule Rule for Adherence Data export Lambda"
-         Name:               "{{stack_prefix}}-WFMSnowflakeDataExportCWRule1"
-         ScheduleExpression: "rate(30 minutes)"
-         State:              "ENABLED"
-         Targets:
-         -
-            Arn:  !ImportValue {{stack_prefix}}-TenantIteratorFunctionArn
-            Id:   DatalakeIncontactAdherenceDataFunctionV1
-            Input: "{\"lambdaNameToExecute\":\"{{lambda_name}}\",\"uri\":\"tenant?application=wfm&settings=wfm_acd_integration:ic&sensitive=true\",\"uri_new\":\"tenants/basicInfo?application=wfm&settings=wfm_acd_integration:ic\",\"tenants_filter_off_ft\":\"utility-wfm-AdherenceICDataFeed-CXWFM-22696\"}"
-
- PermissionForEventsToInvokeTenantIteratorForRtaDataCollectionLambda:
-     Type: "AWS::Lambda::Permission"
-     Properties:
-         FunctionName: !ImportValue {{stack_prefix}}-TenantIteratorFunctionArn
-         Action:       "lambda:InvokeFunction"
-         Principal:    "events.amazonaws.com"
-         SourceArn:    !GetAtt  DatalakeIncontactAdherenceCWRule.Arn
-
- WarningConcurrentExecutionsAlarm:
-   Type: AWS::CloudWatch::Alarm
-   Properties:
-     AlarmDescription: Warning concurrentExecution alarm for lambda.
-     AlarmName: {{profile}}-CEW-lambda-wfm-data-export
-     Namespace: AWS/Lambda
-     MetricName: ConcurrentExecutions
-     Dimensions:
-     - Name: FunctionName
-       Value: {{lambda_name}}
-     Statistic: Maximum
-     Period: '60'
-     EvaluationPeriods: '1'
-     Threshold: 120
-     TreatMissingData: notBreaching
-     ComparisonOperator: GreaterThanOrEqualToThreshold
-     AlarmActions:
-     -  !Ref WFMDLConsumersSNSTopic
-
-
- CriticalConcurrentExecutionsAlarm:
-   Type: AWS::CloudWatch::Alarm
-   Properties:
-     AlarmDescription: concurrentExecution critical alarm for lambda.
-     AlarmName: {{profile}}-CEC-lambda-incontact-adherence
-     Namespace: AWS/Lambda
-     MetricName: ConcurrentExecutions
-     Dimensions:
-     - Name: FunctionName
-       Value: {{lambda_name}}
-     Statistic: Maximum
-     Period: '60'
-     EvaluationPeriods: '1'
-     Threshold: 135
-     TreatMissingData: notBreaching
-     ComparisonOperator: GreaterThanOrEqualToThreshold
-     AlarmActions:
-     -  !Ref WFMDLConsumersSNSTopic
-     -  !ImportValue
-       Fn::Sub: {{stack_prefix}}-BMCCriticalAlarmTopic
-
- ThrottleAlarm:
-   Type: AWS::CloudWatch::Alarm
-   Properties:
-     AlarmDescription: Throttle alarm for lambda.
-     AlarmName: {{profile}}-throttle-wfm-data-export
-     Namespace: AWS/Lambda
-     MetricName: Throttles
-     Dimensions:
-     - Name: FunctionName
-       Value: {{lambda_name}}
-     Statistic: Maximum
-     Period: '60'
-     EvaluationPeriods: '1'
-     Threshold: 150
-     TreatMissingData: notBreaching
-     ComparisonOperator: GreaterThanOrEqualToThreshold
-     AlarmActions:
-     -  !Ref WFMDLConsumersSNSTopic
-     -  !ImportValue
-       Fn::Sub: {{stack_prefix}}-BMCCriticalAlarmTopic
+Outputs:
+  apiGatewayInvokeURL:
+    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentType}/
+  lambdaArn:
+    Value: !GetAtt lambdaFunction.Arn

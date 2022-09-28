@@ -50,7 +50,7 @@ function buildGetRequest(path, token, tenant, host, isUserHubApi) {
                 };
 
     if (isUserHubApi){
-        params.headers["Originating-Service-Identifier"] = 'lambda-datalake-incontact-adherence';
+        params.headers["Originating-Service-Identifier"] = 'lambda-wfm-snowflake-data-export';
     }
     return params;
 }
