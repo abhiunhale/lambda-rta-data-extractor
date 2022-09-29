@@ -1,6 +1,6 @@
 template:                 "{{stack_prefix}}-{{lambda_name_default}}-template-{{revision}}.yml"
 lambda_name:              "{{stack_prefix}}-{{lambda_name_default}}"
-stack_name:               "{{stack_prefix}}-{{lambda_name_default}}-lambda"
+stack_name:               "{{stack_prefix}}-{{lambda_name_default}}"
 lambda_archive:           "{{lambda_name_default}}-{{revision}}.zip"
 account_id:               "{{lookup('get_account_id',profile=profile)}}"
 source_dir:               "{{workspace}}"
