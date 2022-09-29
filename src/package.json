@@ -1,5 +1,5 @@
 {
-  "name": "lambda-datalake-incontact-adherence",
+  "name": "lambda-wfm-snowfalke-data-export",
   "version": "1.0.0",
   "description": "Lambda to export wfm data from snowflake",
   "main": "index.js",
