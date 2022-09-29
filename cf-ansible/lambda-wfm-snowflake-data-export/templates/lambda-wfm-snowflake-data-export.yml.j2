@@ -30,7 +30,7 @@ Parameters:
   WFMExportSFDataGatewayName:
         Description: 'WFM Snowflake data export gateway'
         Type: 'AWS::SSM::Parameter::Value<String>'
-        Default: '/{{profile}}/aws/apigateway/WFMSFDataExport'
+        Default: {{stack_prefix}}-WFMSFDataExport
 
   WFMExportSFDataGatewayStageName:
         Description: 'WFM Snowflake data export gateway stage'
