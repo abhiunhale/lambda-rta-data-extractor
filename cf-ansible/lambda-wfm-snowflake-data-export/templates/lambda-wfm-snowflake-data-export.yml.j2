@@ -29,12 +29,12 @@ Parameters:
 
   WFMExportSFDataGatewayName:
         Description: 'WFM Snowflake data export gateway'
-        Type: 'AWS::SSM::Parameter::Value<String>'
-        Default: {{stack_prefix}}-WFMSFDataExport
+        Type: String
+        Default: {{stack_prefix}}-WFM-SFDataExport
 
   WFMExportSFDataGatewayStageName:
         Description: 'WFM Snowflake data export gateway stage'
-        Type: 'AWS::SSM::Parameter::Value<String>'
+        Type: String
         Default: '{{stack_prefix}}'
 
   WFMExportSFDataGatewayHTTPMethod:
