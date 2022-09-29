@@ -218,4 +218,4 @@ Outputs:
   apiGatewayInvokeURL:
     Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentType}/
   lambdaArn:
-    Value: !GetAtt lambdaFunction.Arn
+    Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
