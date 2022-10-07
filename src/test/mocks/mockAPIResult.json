@@ -1,0 +1,112 @@
+{
+  "tenant" : {
+    "tenantId" : "11e8c2d2-5fbe-ca60-8524-0242ac110009",
+    "tenantName" : "perm_pm_kepler_tenant",
+    "schemaName" : "perm_pm_kepler_tenant24134840",
+    "parentId" : "11e70a76-c97d-c110-b9f3-0242ac110002",
+    "partnerId" : "11e70a76-c97d-c110-b9f3-0242ac110002",
+    "source" : "tm-webapp",
+    "creationDate" : "2018-09-28T03:55:48.959+00:00",
+    "expirationDate" : "3000-01-01T00:00:00.000+00:00",
+    "timezone" : "America/Denver",
+    "status" : "ACTIVE",
+    "type" : "CUSTOMER",
+    "customerType" : "BASIC",
+    "clusterId" : "TO32",
+    "billingId" : "1126321578",
+    "billingCycle" : 1,
+    "billingTelephoneNumber" : "9051321578",
+    "metaData" : {
+      "licenses" : "25",
+      "defaultUserUsername" : "pm.kepler.administrator@wfosaas.com",
+      "defaultUserEmail" : "pm.kepler.administrator@wfosaas.com"
+    },
+    "licenses" : [ {
+      "applicationId" : "PLATFORMSERVICES",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 141, 62, 111 ],
+      "settings" : { }
+    }, {
+      "applicationId" : "WFI",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 34 ],
+      "settings" : { }
+    }, {
+      "applicationId" : "WFM",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 102 ],
+      "settings" : {
+        "wfm_acd_integration" : "CISCO_UCCX_11_5"
+      }
+    }, {
+      "applicationId" : "ACD",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 64, 1, 65, 66, 67, 40, 11, 108, 109, 52, 56, 122, 61, 63 ],
+      "settings" : {
+        "concurrentPortLimit" : "1",
+        "outboundPortLimit" : null,
+        "agentlessPortLimit" : null,
+        "ACDStationLimit" : null,
+        "ACDUserLimit" : null,
+        "ACDConcurrentUserLimit" : null
+      }
+    }, {
+      "applicationId" : "RECORDING",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 105, 106 ],
+      "settings" : {
+        "recordingMode" : "stereo"
+      }
+    }, {
+      "applicationId" : "CXSUP",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 401 ],
+      "settings" : { }
+    }, {
+      "applicationId" : "DASHBOARDS",
+      "productId" : "EVOLVE",
+      "featureIds" : [ 232 ],
+      "settings" : { }
+    } ],
+    "userSoftLimit" : 500,
+    "brandingProfileId" : null,
+    "presenceSyncEnabled" : false,
+    "directorySyncEnabled" : false,
+    "platformVersion" : null,
+    "presenceSyncVersionDetails" : null,
+    "presenceSyncSettingDetails" : null,
+    "availableForDeletion" : false,
+    "tenantDeletionInfo" : null,
+    "errorCode" : null,
+    "tenantFlowCheck" : {
+      "uhAccountCreated" : null,
+      "roleSyncFinished" : null,
+      "roleSynced" : true,
+      "userCreateFinished" : null,
+      "userCreated" : true,
+      "syncWithACDFinished" : null,
+      "syncedWithACD" : true
+    },
+    "markedForDeletion" : false,
+    "applicationUserDetails" : [ ],
+    "hasProcessRights" : false,
+    "processingStartDate" : null,
+    "systemType" : "CXONE",
+    "partnerName" : null,
+    "templateId" : null,
+    "templateVersion" : 0,
+    "disableImpersonateAndSupport" : false,
+    "disableImpersonateAndConfigure" : false,
+    "converted" : false,
+    "modificationDate" : "2022-08-18T19:24:31.877+00:00"
+  },
+  "users" : [{
+    "id": 1,
+    "firstName": "ABC",
+    "lastName": "ABC"
+  },{
+    "id": 2,
+    "firstName": "XYZ",
+    "lastName": "XYZ"
+  }]
+}
