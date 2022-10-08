@@ -6,13 +6,14 @@ let sinon = require("sinon");
 let LambdaTester = require('lambda-tester');
 let LambdaUtils = require('../LambdaUtils.js');
 let mainModule = rewire('../index.js');
+let AWSMock = require('aws-sdk-mock');
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
 let executor;
 var mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
 
 describe('WFM RTA export report test', function () {
-    this.timeout(3000);
+    this.timeout(120000);
     var getMockEvent = function (eventData) {
         return eventData;
     };
@@ -22,6 +23,10 @@ describe('WFM RTA export report test', function () {
         mockAPIResponse = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockAPIResult.json'))));
         process.env.SERVICE_URL = "https://na1.test.nice-incontact.com";
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
+        AWSMock.mock('S3', 'upload', (params, callback) => {
+            let data = {"Location": "ABC"};
+            callback(null, data);
+        });
         executor = new Executor(mockEvent, {});
     });
 
@@ -38,14 +43,13 @@ describe('WFM RTA export report test', function () {
             .expectResult((result) => {
                 expect(result.statusCode).to.exist;
                 expect(result.statusCode).to.equal(200);
-                expect(result.message).to.exist;
-                expect(result.message).to.equal("hello world");
+                expect(result.location).to.exist;
                 done();
             })
             .catch(done);
     });
 
-    it("Verify executor authenticate request method", async() => {
+    it("Verify success of executor authenticate request method", async () => {
         performGetRequestToCXoneStub.resolves(JSON.stringify(mockAPIResponse));
         let result = await executor.authenticateRequest();
     });
@@ -62,7 +66,7 @@ describe('WFM RTA export report test', function () {
             .catch(done);
     });
 
-    it("Verify executor authenticate request method", done => {
+    it("Verify failure in executor authenticate request method", done => {
         let errorMsg = {err: 'Invalid token'};
         performGetRequestToCXoneStub.rejects(errorMsg);
         executor.authenticateRequest().catch(error => {
@@ -168,18 +172,24 @@ describe('WFM RTA export report test', function () {
         expect(userIds.length).to.equal(0);
     });
 
-    it("Verify executor method returns non empty list when users are present", async() => {
+    it("Verify executor method returns non empty list when users are present", async () => {
         performGetRequestToCXoneStub.resolves(JSON.stringify(mockAPIResponse));
         let userIds = await executor.getUsersFromUH();
         expect(userIds.length).to.equal(2);
     });
 
-    it("Verify executor method returns empty list when users API fails", async() => {
-        let response={};
+    it("Verify executor method returns empty list when users API fails", async () => {
+        let response = {};
         response.tenant = mockAPIResponse.tenant;
         performGetRequestToCXoneStub.resolves(JSON.stringify(response));
         let userIds = await executor.getUsersFromUH();
         expect(userIds.length).to.equal(0);
+    });
+
+    it("Verify generate file name executor method", async () => {
+        let fileName = await executor.generateFileName();
+        expect(fileName.split("_")[0].length).to.equal(14);
+        expect(fileName.split("_")[1]).to.equal("Adherence.json");
     });
 
 });
@@ -193,6 +203,7 @@ describe('WFM RTA export report  failure test cases', function () {
     beforeEach(function () {
         mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
         process.env.SERVICE_URL = "";
+        executor = new Executor(mockEvent, {});
     });
 
     it("Report export Fail without host", done => {
@@ -203,5 +214,16 @@ describe('WFM RTA export report  failure test cases', function () {
                 done();
             })
             .catch(done);
+    });
+
+    it("Verify failure while uploading file to s3", async () => {
+        let error = "Fail to upload file to s3";
+        let fileName = "ABC.json";
+        let data = "";
+        AWSMock.mock('S3', 'upload', function (params, callback) {
+            callback(error, null);
+        });
+        let fileLocation = await executor.saveAdherenceFileToS3(fileName, data);
+        expect(fileLocation).to.equal("");
     });
 });
