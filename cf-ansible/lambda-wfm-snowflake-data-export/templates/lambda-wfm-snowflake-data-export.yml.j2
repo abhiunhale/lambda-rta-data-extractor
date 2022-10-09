@@ -102,11 +102,7 @@ Resources:
           Uri: !Sub
             - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
             - lambdaArn: !GetAtt WFMSnowflakeExportDataFunction.Arn
-          IntegrationResponses:
-            - StatusCode: "200"
-        MethodResponses:
-          - StatusCode: "200"
-        RequestTemplates:
+          RequestTemplates:
             "application/json" : "{
                 \"body\" : $input.json('$'),
                 \"headers\": {
@@ -114,6 +110,11 @@ Resources:
                     \"$header\": \"$util.escapeJavaScript($input.params().header.get($header))\" #if($foreach.hasNext),#end
                     #end }
                 }"
+
+          IntegrationResponses:
+            - StatusCode: "200"
+        MethodResponses:
+          - StatusCode: "200"
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
