@@ -32,6 +32,7 @@ describe('WFM RTA export report test', function () {
 
     afterEach(function(){
         performGetRequestToCXoneStub.restore();
+        AWSMock.restore();
     });
 
     it("Report export Done with status = 200", done => {
