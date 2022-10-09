@@ -109,14 +109,14 @@ exports.Executor = Executor;
  * Lambda to extract WFM data from Snowflake DL
  */
 exports.handler = async (event, context) => {
+    logger.log("event:" + JSON.stringify(event));
     let response = {};
     let hasWFMLicense = false;
-    let executor = new Executor(event, context);
+    let executor = new Executor(event);
     let failureMessage = "Fail to extract WFM data";
     commonUtils.loggerUtils.setDebugMode(process.env.DEBUG);
 
     logger.info('1. BEGIN HANDLER AND VERIFY HOST');
-    logger.log("event:" + JSON.stringify(event));
     logger.log('host from process :' + process.env.SERVICE_URL);
 
     if (!process.env.SERVICE_URL) {

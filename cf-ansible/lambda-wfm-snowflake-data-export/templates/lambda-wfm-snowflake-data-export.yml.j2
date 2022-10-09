@@ -106,6 +106,14 @@ Resources:
             - StatusCode: "200"
         MethodResponses:
           - StatusCode: "200"
+        RequestTemplates:
+            "application/json" : "{
+                \"body\" : $input.json('$'),
+                \"headers\": {
+                    #foreach($header in $input.params().header.keySet())
+                    \"$header\": \"$util.escapeJavaScript($input.params().header.get($header))\" #if($foreach.hasNext),#end
+                    #end
+                }
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
