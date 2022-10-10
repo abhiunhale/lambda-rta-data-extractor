@@ -1,6 +1,9 @@
 'use strict';
 
 let AWS = require('aws-sdk');
+const getStream = require('get-stream');
+const fs = require('fs');
+const {parse} = require('csv-parse');
 let moment = require('moment');
 let Promise = require("bluebird");
 Promise.allSettled = require("promise.allsettled");
@@ -15,6 +18,20 @@ function Executor(event) {
     let host = process.env.SERVICE_URL;
     let token = event.evolveAuth.token;
     let tenant = {};
+    let exportFT = "release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+    let isFTOn;
+
+    self.verifyFeatureToggleIsOn = async function () {
+        logger.info('Step - GET the state of Feature Toggle');
+        await LambdaUtils.performGetRequestToCXone("/config/toggledFeatures/check?featureName=" + exportFT, token, host, true, tenant.schemaName).then((response) => {
+            isFTOn = JSON.parse(response);
+            logger.log("feature toggle status: " + isFTOn);
+        }).catch((error) => {
+            logger.log('Failed to get FT status response' + error);
+            isFTOn = false;
+        });
+        return isFTOn;
+    };
 
     self.authenticateRequest = async function () {
         logger.info('Step - Call TM for getting tenant IC details');
@@ -73,9 +90,10 @@ function Executor(event) {
 
     self.generateFileName = function () {
         //sample file name : 20221007155945_pm.kepler.administrator@wfosaas.com.csv
+        let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
         let fileName;
         let currentTime = moment(new Date()).format("yyyyMMDDHHmmss");
-        fileName = currentTime + "_Adherence.json";
+        fileName = currentTime + "_" + decoded_token.name + ".csv";
         return fileName;
     };
 
@@ -89,7 +107,7 @@ function Executor(event) {
         let s3FileParams = {
             Bucket: "rta-export-disha",
             Key: "report/export/" + tenant.schemaName + "/adherence1/" + filename,
-            Body: JSON.stringify(data)
+            Body: data
         };
         let fileLocation = "";
 
@@ -116,7 +134,7 @@ exports.handler = async (event, context) => {
     let failureMessage = "Fail to extract WFM data";
     commonUtils.loggerUtils.setDebugMode(process.env.DEBUG);
 
-    logger.info('1. BEGIN HANDLER AND VERIFY HOST');
+    logger.info('0. BEGIN HANDLER AND VERIFY HOST');
     logger.log('host from process :' + process.env.SERVICE_URL);
 
     if (!process.env.SERVICE_URL) {
@@ -124,12 +142,18 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        logger.info('2. AUTHENTICATE REQUEST');
+        logger.info('1. AUTHENTICATE REQUEST');
         await executor.authenticateRequest();
 
-        logger.info('3. VERIFY WFM LICENSE');
+        logger.info('2. VERIFY WFM LICENSE');
         hasWFMLicense = executor.verifyWFMLicense();
         if (!hasWFMLicense) {
+            return context.fail(failureMessage);
+        }
+
+        logger.info('3. Verify Feature Toggle');
+        let isFTOn = await executor.verifyFeatureToggleIsOn();
+        if (!isFTOn) {
             return context.fail(failureMessage);
         }
 
@@ -147,7 +171,11 @@ exports.handler = async (event, context) => {
         logger.log("generated file name : " + filename);
 
         logger.info('7. UPLOAD FILE TO S3');
-        let data = require('./test/mocks/mockAdherenceData.json');
+        let data;
+        const parseStream = parse({delimiter: ","});
+        data = await getStream.array(fs.createReadStream('./test/mocks/mockAdherence.csv').pipe(parseStream));
+        data = data.map(line => line.join(',')).join('\n');
+
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
         logger.log("fileLocation:" + fileLocation);
         response = {

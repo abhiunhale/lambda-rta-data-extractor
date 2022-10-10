@@ -52,7 +52,7 @@ describe('WFM RTA export report test', function () {
 
     it("Verify success of executor authenticate request method", async () => {
         performGetRequestToCXoneStub.resolves(JSON.stringify(mockAPIResponse));
-        let result = await executor.authenticateRequest();
+        await executor.authenticateRequest();
     });
 
     it("Verify handler failure while request authentication", done => {
@@ -88,36 +88,70 @@ describe('WFM RTA export report test', function () {
                 "licenses" : [ {
                     "applicationId" : "PLATFORMSERVICES",
                     "productId" : "EVOLVE",
-                    "featureIds" : [ 141, 62, 111 ],
-                    "settings" : { }
+                    "featureIds": [141, 62, 111],
+                    "settings": {}
                 }]
-        }};
+            }
+        };
         performGetRequestToCXoneStub.resolves(JSON.stringify(tenant));
         await executor.authenticateRequest();
         let hasLicense = executor.verifyWFMLicense();
         expect(hasLicense).to.equal(false);
     });
 
-    it("Verify executor method returns false when licenses are not present", async() => {
-        let tenant = {"tenant" : { "licenses": [] }};
+    it("Verify executor method returns false when licenses are not present", async () => {
+        let tenant = {"tenant": {"licenses": []}};
         performGetRequestToCXoneStub.resolves(JSON.stringify(tenant));
         await executor.authenticateRequest();
         let hasLicense = executor.verifyWFMLicense();
         expect(hasLicense).to.equal(false);
     });
 
-    it("Verify executor method returns true when event has valid request", async() => {
+    it("Verify error if the feature toggle is off", done => {
+        let errorMsg = "Fail to extract WFM data";
+        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", mockEvent.evolveAuth.token, process.env.SERVICE_URL, false)
+            .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
+        performGetRequestToCXoneStub.withArgs(featurePath, mockEvent.evolveAuth.token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName).onCall(0).returns(Promise.resolve('false'));
+
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.equal(errorMsg);
+                done();
+            })
+            .catch(done);
+    });
+
+    it("Verify error if the feature toggle api fails", done => {
+        let errorMsg = "Fail to extract WFM data";
+        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", mockEvent.evolveAuth.token, process.env.SERVICE_URL, false)
+            .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
+        performGetRequestToCXoneStub.withArgs(featurePath, mockEvent.evolveAuth.token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
+            .onCall(0).returns(Promise.reject('Invalid Token in API'));
+
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.equal(errorMsg);
+                done();
+            })
+            .catch(done);
+    });
+
+    it("Verify executor method returns true when event has valid request", async () => {
         let isEventValid = executor.verifyEvent();
         expect(isEventValid).to.equal(true);
     });
 
-    it("Verify executor method returns false when event has no request", async() => {
+    it("Verify executor method returns false when event has no request", async () => {
         let invalidEvent = {
             "evolveAuth": {
-                "token" : "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
             }
         };
-        let executorWithInvalidEvent = new Executor(invalidEvent,{});
+        let executorWithInvalidEvent = new Executor(invalidEvent, {});
         let isEventValid = executorWithInvalidEvent.verifyEvent();
         expect(isEventValid).to.equal(false);
     });
@@ -190,7 +224,7 @@ describe('WFM RTA export report test', function () {
     it("Verify generate file name executor method", async () => {
         let fileName = await executor.generateFileName();
         expect(fileName.split("_")[0].length).to.equal(14);
-        expect(fileName.split("_")[1]).to.equal("Adherence.json");
+        expect(fileName.split("_")[1]).to.equal("pm.kepler.administrator@wfosaas.com.csv");
     });
 
 });
