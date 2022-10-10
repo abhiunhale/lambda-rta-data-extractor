@@ -61,7 +61,7 @@ describe('WFM RTA export report test', function () {
         LambdaTester(Handler)
             .event(mockEvent)
             .expectError(error => {
-                expect(error.message).to.equal(JSON.stringify(errorMsg));
+                expect(error.message).to.equal("Fail to extract WFM data");
                 done();
             })
             .catch(done);

@@ -196,8 +196,9 @@ Resources:
                {% endfor %}
          Environment:
              Variables:
-                 AWS_PROFILE:     "{{stack_prefix}}"
-                 SERVICE_URL:   "{{service_url}}"
+                 AWS_PROFILE:  "{{stack_prefix}}"
+                 SERVICE_URL:  "{{service_url}}"
+                 DATALAKE_BUCKET : "{{datalake_bucket}}"
                  DEBUG:        "true"
          Code:
              S3Bucket: !Ref SourceCodeBucket

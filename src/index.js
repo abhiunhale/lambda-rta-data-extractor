@@ -16,6 +16,7 @@ function Executor(event) {
 
     let self = this;
     let host = process.env.SERVICE_URL;
+    let data_lake_bucket = process.env.DATALAKE_BUCKET
     let token = event.evolveAuth.token;
     let tenant = {};
     let exportFT = "release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
@@ -102,10 +103,10 @@ function Executor(event) {
         let s3 = new AWS.S3({
             apiVersion: "2012-10-17"
         });
-
+        logger.log("bucket used for upload" + (data_lake_bucket || "rta-export-disha"));
         //s3 path : dev-datalake-cluster-bucket-q37evqefmksl/report/export/perm_pm_kepler/adherence/
         let s3FileParams = {
-            Bucket: "rta-export-disha",
+            Bucket: data_lake_bucket || "rta-export-disha",
             Key: "report/export/" + tenant.schemaName + "/adherence1/" + filename,
             Body: data
         };
@@ -183,7 +184,7 @@ exports.handler = async (event, context) => {
             location: fileLocation
         };
     } catch (error) {
-        return context.fail(error);
+        return context.fail(failureMessage);
     }
 
     return response;
