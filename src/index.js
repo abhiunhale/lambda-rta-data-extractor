@@ -3,6 +3,7 @@
 let AWS = require('aws-sdk');
 const getStream = require('get-stream');
 const fs = require('fs');
+const path = require('path');
 const {parse} = require('csv-parse');
 let moment = require('moment');
 let Promise = require("bluebird");
@@ -21,7 +22,6 @@ function Executor(event) {
     let tenant = {};
     let exportFT = "release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
     let isFTOn;
-    logger.log("bucket used for upload" + (data_lake_bucket || "rta-export-disha"));
 
     self.verifyFeatureToggleIsOn = async function () {
         logger.info('Step - GET the state of Feature Toggle');
@@ -104,10 +104,10 @@ function Executor(event) {
         let s3 = new AWS.S3({
             apiVersion: "2012-10-17"
         });
-        logger.log("bucket used for upload" + (data_lake_bucket || "rta-export-disha"));
+        logger.log("bucket used for upload" + (data_lake_bucket));
         //s3 path : dev-datalake-cluster-bucket-q37evqefmksl/report/export/perm_pm_kepler/adherence/
         let s3FileParams = {
-            Bucket: data_lake_bucket || "rta-export-disha",
+            Bucket: data_lake_bucket,
             Key: "report/export/" + tenant.schemaName + "/adherence1/" + filename,
             Body: data
         };
@@ -175,7 +175,7 @@ exports.handler = async (event, context) => {
         logger.info('7. UPLOAD FILE TO S3');
         let data;
         const parseStream = parse({delimiter: ","});
-        data = await getStream.array(fs.createReadStream("mockAdherence.csv").pipe(parseStream));
+        data = await getStream.array(fs.createReadStream(path.join(__dirname, "./test/mocks/mockAdherence.csv")).pipe(parseStream));
         data = data.map(line => line.join(',')).join('\n');
 
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
