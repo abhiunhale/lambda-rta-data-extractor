@@ -16,11 +16,12 @@ function Executor(event) {
 
     let self = this;
     let host = process.env.SERVICE_URL;
-    let data_lake_bucket = process.env.DATALAKE_BUCKET
+    let data_lake_bucket = process.env.DATALAKE_BUCKET;
     let token = event.evolveAuth.token;
     let tenant = {};
     let exportFT = "release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
     let isFTOn;
+    logger.log("bucket used for upload" + (data_lake_bucket || "rta-export-disha"));
 
     self.verifyFeatureToggleIsOn = async function () {
         logger.info('Step - GET the state of Feature Toggle');
@@ -174,7 +175,7 @@ exports.handler = async (event, context) => {
         logger.info('7. UPLOAD FILE TO S3');
         let data;
         const parseStream = parse({delimiter: ","});
-        data = await getStream.array(fs.createReadStream('./test/mocks/mockAdherence.csv').pipe(parseStream));
+        data = await getStream.array(fs.createReadStream("mockAdherence.csv").pipe(parseStream));
         data = data.map(line => line.join(',')).join('\n');
 
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
@@ -184,6 +185,7 @@ exports.handler = async (event, context) => {
             location: fileLocation
         };
     } catch (error) {
+        console.log(error);
         return context.fail(failureMessage);
     }
 
