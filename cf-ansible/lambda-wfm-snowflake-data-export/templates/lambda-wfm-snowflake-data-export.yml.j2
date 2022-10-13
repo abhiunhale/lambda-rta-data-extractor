@@ -35,7 +35,7 @@ Parameters:
   WFMExportSFDataGatewayStageName:
         Description: 'WFM Snowflake data export gateway stage'
         Type: String
-        Default: '{{stack_prefix}}'
+        Default: 'wfm'
 
   WFMExportSFDataGatewayHTTPMethod:
     Type: String
@@ -102,6 +102,14 @@ Resources:
           Uri: !Sub
             - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
             - lambdaArn: !GetAtt WFMSnowflakeExportDataFunction.Arn
+            RequestTemplates:
+                "application/json" : "{
+                    \"body\" : $input.json('$'),
+                    \"headers\": {
+                    #foreach($header in $input.params().header.keySet())
+                    \"$header\": \"$util.escapeJavaScript($input.params().header.get($header))\" #if($foreach.hasNext),#end
+                    #end }
+                    }"
           IntegrationResponses:
             - StatusCode: "200"
         MethodResponses:
@@ -189,6 +197,8 @@ Resources:
              Variables:
                  AWS_PROFILE:     "{{stack_prefix}}"
                  DEBUG:        "true"
+                 SERVICE_URL:  "{{service_url}}"
+                 DATALAKE_BUCKET : "{{datalake_bucket}}"
          Code:
              S3Bucket: !Ref SourceCodeBucket
              S3Key:    "{{s3_directory}}/{{lambda_archive}}"
@@ -217,6 +227,6 @@ Resources:
 
 Outputs:
   apiGatewayInvokeURL:
-    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentType}/export
+    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm/export
   lambdaArn:
     Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
