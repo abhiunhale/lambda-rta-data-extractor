@@ -19,7 +19,7 @@ exports.Executor = Executor;
  * Your AWS Lambda description goes here
  */
 exports.handler = async (event, context) => {
-    console.log("in the lambda handler function");
+    console.log("in the lambda handler function : " + JSON.stringify(event));
 
     let response = {
         statusCode: 200,
