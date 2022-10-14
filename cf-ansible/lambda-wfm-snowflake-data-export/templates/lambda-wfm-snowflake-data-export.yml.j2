@@ -123,7 +123,7 @@ Resources:
         - apiGatewayRootMethod
       Properties:
         RestApiId: !Ref apiGateway
-        StageName: !Ref EnvironmentType
+        StageName: !Ref WFMExportSFDataGatewayStageName
 
   lambdaApiGatewayInvoke:
     Type: AWS::Lambda::Permission

@@ -21,13 +21,15 @@ describe('WFM RTA export report test', function () {
     beforeEach(function () {
         mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
         mockAPIResponse = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockAPIResult.json'))));
-        process.env.SERVICE_URL = "https://na1.test.nice-incontact.com";
+        process.env.DATALAKE_BUCKET = "rta-export-disha";
+        process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
             callback(null, data);
         });
-        executor = new Executor(mockEvent, {});
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        executor = new Executor(mockEvent.body, token);
     });
 
     afterEach(function(){
@@ -110,9 +112,10 @@ describe('WFM RTA export report test', function () {
     it("Verify error if the feature toggle is off", done => {
         let errorMsg = "Fail to extract WFM data";
         let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
-        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", mockEvent.evolveAuth.token, process.env.SERVICE_URL, false)
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
-        performGetRequestToCXoneStub.withArgs(featurePath, mockEvent.evolveAuth.token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName).onCall(0).returns(Promise.resolve('false'));
+        performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName).onCall(0).returns(Promise.resolve('false'));
 
         LambdaTester(Handler)
             .event(mockEvent)
@@ -126,9 +129,10 @@ describe('WFM RTA export report test', function () {
     it("Verify error if the feature toggle api fails", done => {
         let errorMsg = "Fail to extract WFM data";
         let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
-        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", mockEvent.evolveAuth.token, process.env.SERVICE_URL, false)
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
-        performGetRequestToCXoneStub.withArgs(featurePath, mockEvent.evolveAuth.token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
+        performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.reject('Invalid Token in API'));
 
         LambdaTester(Handler)

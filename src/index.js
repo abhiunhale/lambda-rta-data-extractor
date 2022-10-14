@@ -13,12 +13,11 @@ let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 const USER_HUB_PATH = "/user-management/v1/users";
 
-function Executor(event) {
+function Executor(event, token) {
 
     let self = this;
     let host = process.env.SERVICE_URL;
     let data_lake_bucket = process.env.DATALAKE_BUCKET;
-    let token = event.evolveAuth.token;
     let tenant = {};
     let exportFT = "release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
     let isFTOn;
@@ -65,7 +64,7 @@ function Executor(event) {
 
     self.verifyEvent = function () {
         logger.info('Step - Verify event details');
-        logger.info("event for verification : " + JSON.stringify(event));
+        logger.info("event for verification in executor: " + JSON.stringify(event));
         if (!event || !event.reportName || event.reportName !== "adherenceV2") {
             return false;
         }
@@ -73,7 +72,6 @@ function Executor(event) {
             return false;
         }
         return !(!event.query || event.query.length <= 0);
-
     };
 
     self.getUsersFromUH = async function () {
@@ -108,7 +106,7 @@ function Executor(event) {
         //s3 path : dev-datalake-cluster-bucket-q37evqefmksl/report/export/perm_pm_kepler/adherence/
         let s3FileParams = {
             Bucket: data_lake_bucket,
-            Key: "report/export/" + tenant.schemaName + "/adherence1/" + filename,
+            Key: "report/export/" + tenant.schemaName + "/adherence/" + filename,
             Body: data
         };
         let fileLocation = "";
@@ -132,7 +130,9 @@ exports.handler = async (event, context) => {
     logger.log("event:" + JSON.stringify(event));
     let response = {};
     let hasWFMLicense = false;
-    let executor = new Executor(event);
+    let token = event.headers.Authorization.split(" ")[1];
+    logger.log("Token : " + token);
+    let executor = new Executor(event.body, token);
     let failureMessage = "Fail to extract WFM data";
     commonUtils.loggerUtils.setDebugMode(process.env.DEBUG);
 
@@ -188,6 +188,5 @@ exports.handler = async (event, context) => {
         console.log(error);
         return context.fail(failureMessage);
     }
-
     return response;
 };
