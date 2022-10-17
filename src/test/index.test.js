@@ -7,6 +7,8 @@ let LambdaTester = require('lambda-tester');
 let LambdaUtils = require('../LambdaUtils.js');
 let mainModule = rewire('../index.js');
 let AWSMock = require('aws-sdk-mock');
+let constantUtils = require("../ConstantUtils");
+const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
 let executor;
@@ -21,7 +23,7 @@ describe('WFM RTA export report test', function () {
     beforeEach(function () {
         mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
         mockAPIResponse = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockAPIResult.json'))));
-        process.env.DATALAKE_BUCKET = "rta-export-disha";
+        process.env.DATALAKE_BUCKET = "sample-dl-bucket";
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
@@ -46,7 +48,7 @@ describe('WFM RTA export report test', function () {
             .expectResult((result) => {
                 expect(result.statusCode).to.exist;
                 expect(result.statusCode).to.equal(200);
-                expect(result.location).to.exist;
+                expect(result.message).to.exist;
                 done();
             })
             .catch(done);
@@ -62,8 +64,11 @@ describe('WFM RTA export report test', function () {
         performGetRequestToCXoneStub.rejects(errorMsg);
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectError(error => {
-                expect(error.message).to.equal("Fail to extract WFM data");
+            .expectResult(result => {
+                expect(result.statusCode).to.exist;
+                expect(result.statusCode).to.equal(500);
+                expect(result.message).to.exist;
+                expect(result.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -110,7 +115,6 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify error if the feature toggle is off", done => {
-        let errorMsg = "Fail to extract WFM data";
         let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
         let token = mockEvent.headers.Authorization.split(" ")[1];
         performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
@@ -119,15 +123,17 @@ describe('WFM RTA export report test', function () {
 
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectError(error => {
-                expect(error.message).to.equal(errorMsg);
+            .expectResult(result => {
+                expect(result.statusCode).to.exist;
+                expect(result.statusCode).to.equal(500);
+                expect(result.message).to.exist;
+                expect(result.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
     });
 
     it("Verify error if the feature toggle api fails", done => {
-        let errorMsg = "Fail to extract WFM data";
         let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
         let token = mockEvent.headers.Authorization.split(" ")[1];
         performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
@@ -137,8 +143,11 @@ describe('WFM RTA export report test', function () {
 
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectError(error => {
-                expect(error.message).to.equal(errorMsg);
+            .expectResult(result => {
+                expect(result.statusCode).to.exist;
+                expect(result.statusCode).to.equal(500);
+                expect(result.message).to.exist;
+                expect(result.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -217,12 +226,26 @@ describe('WFM RTA export report test', function () {
         expect(userIds.length).to.equal(2);
     });
 
-    it("Verify executor method returns empty list when users API fails", async () => {
-        let response = {};
-        response.tenant = mockAPIResponse.tenant;
-        performGetRequestToCXoneStub.resolves(JSON.stringify(response));
-        let userIds = await executor.getUsersFromUH();
-        expect(userIds.length).to.equal(0);
+    it("Verify failure in handler method when users API fails", done => {
+        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
+            .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
+        performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
+            .onCall(0).returns(Promise.resolve(true));
+        performGetRequestToCXoneStub.withArgs(constants.USER_HUB_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
+            .onCall(0).returns(Promise.reject('Invalid Token in API'));
+
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectResult(result => {
+                expect(result.statusCode).to.exist;
+                expect(result.statusCode).to.equal(500);
+                expect(result.message).to.exist;
+                expect(result.message).to.equal(constants.INTERNAL_ERROR);
+                done();
+            })
+            .catch(done);
     });
 
     it("Verify generate file name executor method", async () => {
@@ -248,8 +271,11 @@ describe('WFM RTA export report  failure test cases', function () {
     it("Report export Fail without host", done => {
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectError(error => {
-                expect(error.message).to.equal("FAILED TO VALIDATE HOST");
+            .expectResult(result => {
+                expect(result.statusCode).to.exist;
+                expect(result.statusCode).to.equal(500);
+                expect(result.message).to.exist;
+                expect(result.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -262,7 +288,10 @@ describe('WFM RTA export report  failure test cases', function () {
         AWSMock.mock('S3', 'upload', function (params, callback) {
             callback(error, null);
         });
-        let fileLocation = await executor.saveAdherenceFileToS3(fileName, data);
-        expect(fileLocation).to.equal("");
+        try {
+            await executor.saveAdherenceFileToS3(fileName, data);
+        } catch (err) {
+            expect(err.message).to.equal(JSON.stringify(error));
+        }
     });
 });
