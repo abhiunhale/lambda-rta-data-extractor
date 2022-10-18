@@ -122,7 +122,7 @@ let generateResponse = function (status, message) {
     }
 };
 
-exports.handler = async (event, context) => {
+exports.handler = async (event, context, callback) => {
     logger.log("event:" + JSON.stringify(event));
     commonUtils.loggerUtils.setDebugMode(process.env.DEBUG);
     let hasWFMLicense = false;
@@ -164,7 +164,7 @@ exports.handler = async (event, context) => {
         let isEventValid = executor.verifyEvent();
         if (!isEventValid) {
             logger.error(constants.INVALID_REQUEST);
-            return generateResponse(constants.STATUS_400, constants.BAD_REQUEST);
+            callback(constants.BAD_REQUEST);
         }
 
         logger.info('5. GET LIST OF USER IDs');

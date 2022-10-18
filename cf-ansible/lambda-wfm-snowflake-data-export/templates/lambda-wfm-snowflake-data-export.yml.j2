@@ -111,13 +111,13 @@ Resources:
                     #end }
                     }"
           IntegrationResponses:
-            - StatusCode: "200"
-            - StatusCode: "400"
-            - StatusCode: "500"
+            - StatusCode: 200
+            -
+                SelectionPattern : "Bad Request was provided"
+                StatusCode: 400
         MethodResponses:
-          - StatusCode: "200"
-          - StatusCode: "400"
-          - StatusCode: "500"
+          - StatusCode: 200
+          - StatusCode: 400
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
