@@ -46,9 +46,7 @@ describe('WFM RTA export report test', function () {
         LambdaTester(Handler)
             .event(mockEvent)
             .expectResult((result) => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(200);
-                expect(result.message).to.exist;
+                expect(result.url).to.exist;
                 done();
             })
             .catch(done);
@@ -64,9 +62,7 @@ describe('WFM RTA export report test', function () {
         performGetRequestToCXoneStub.rejects(errorMsg);
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectResult(result => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(500);
+            .expectError(result => {
                 expect(result.message).to.exist;
                 expect(result.message).to.equal(constants.INTERNAL_ERROR);
                 done();
@@ -123,11 +119,9 @@ describe('WFM RTA export report test', function () {
 
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectResult(result => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(500);
-                expect(result.message).to.exist;
-                expect(result.message).to.equal(constants.INTERNAL_ERROR);
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -143,11 +137,9 @@ describe('WFM RTA export report test', function () {
 
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectResult(result => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(500);
-                expect(result.message).to.exist;
-                expect(result.message).to.equal(constants.INTERNAL_ERROR);
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -238,11 +230,9 @@ describe('WFM RTA export report test', function () {
 
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectResult(result => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(500);
-                expect(result.message).to.exist;
-                expect(result.message).to.equal(constants.INTERNAL_ERROR);
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);
@@ -271,11 +261,9 @@ describe('WFM RTA export report  failure test cases', function () {
     it("Report export Fail without host", done => {
         LambdaTester(Handler)
             .event(mockEvent)
-            .expectResult(result => {
-                expect(result.statusCode).to.exist;
-                expect(result.statusCode).to.equal(500);
-                expect(result.message).to.exist;
-                expect(result.message).to.equal(constants.INTERNAL_ERROR);
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.INTERNAL_ERROR);
                 done();
             })
             .catch(done);

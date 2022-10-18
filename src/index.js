@@ -115,12 +115,6 @@ exports.Executor = Executor;
 /**
  * Lambda to extract WFM data from Snowflake DL
  */
-let generateResponse = function (status, message) {
-    return {
-        "statusCode": status,
-        "message": message
-    }
-};
 
 exports.handler = async (event, context, callback) => {
     logger.log("event:" + JSON.stringify(event));
@@ -130,16 +124,16 @@ exports.handler = async (event, context, callback) => {
     let data;
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
-    if (event.headers.Authorization.startsWith("Bearer ")) {
+    if (event.headers.Authorization && event.headers.Authorization.startsWith("Bearer ")) {
         token = event.headers.Authorization.split(" ")[1];
     } else {
         logger.error(constants.INVALID_TOKEN + ": " + event.headers.Authorization);
-        return generateResponse(constants.STATUS_400, constants.BAD_REQUEST);
+        callback(constants.BAD_REQUEST);
     }
     let executor = new Executor(event.body, token);
     if (!process.env.SERVICE_URL) {
         logger.error('Fail to validate host from process :' + process.env.SERVICE_URL);
-        return generateResponse(constants.STATUS_500, constants.INTERNAL_ERROR);
+        callback(constants.INTERNAL_ERROR);
     }
 
     try {
@@ -150,14 +144,14 @@ exports.handler = async (event, context, callback) => {
         hasWFMLicense = executor.verifyWFMLicense();
         if (!hasWFMLicense) {
             logger.error(constants.LICENSE_ERROR);
-            return generateResponse(constants.STATUS_500, constants.INTERNAL_ERROR);
+            callback(constants.INTERNAL_ERROR);
         }
 
         logger.info('3. Verify Feature Toggle');
         let isFTOn = await executor.verifyFeatureToggleIsOn();
         if (!isFTOn) {
             logger.error(constants.FT_ERROR);
-            return generateResponse(constants.STATUS_500, constants.INTERNAL_ERROR);
+            callback(constants.INTERNAL_ERROR);
         }
 
         logger.info('4. VERIFY REQUEST BODY FOR FILTERS');
@@ -179,9 +173,9 @@ exports.handler = async (event, context, callback) => {
         data = data.map(line => line.join(',')).join('\n');
 
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
-        return generateResponse(constants.STATUS_200, fileLocation);
+        callback(null, {"url": fileLocation});
     } catch (error) {
         logger.error(constants.API_FAILURE + ": " + error);
-        return generateResponse(constants.STATUS_500, constants.INTERNAL_ERROR);
+        callback(constants.INTERNAL_ERROR);
     }
 };

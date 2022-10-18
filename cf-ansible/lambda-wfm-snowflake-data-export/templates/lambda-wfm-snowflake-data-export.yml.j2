@@ -115,9 +115,13 @@ Resources:
             -
                 SelectionPattern : "Bad Request was provided"
                 StatusCode: 400
+            -
+                SelectionPattern : "Internal Server Error"
+                StatusCode: 500
         MethodResponses:
           - StatusCode: 200
           - StatusCode: 400
+          - StatusCode: 500
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
