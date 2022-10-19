@@ -1,10 +1,6 @@
 'use strict';
 
 const exportConstant = {
-    STATUS_200: 200,
-    STATUS_400: 400,
-    STATUS_500: 500,
-
     INVALID_TOKEN: "Invalid Authorization are provided",
     INVALID_HOST: "Failed to validate host",
     API_FAILURE: "Failure while calling API",
@@ -19,6 +15,7 @@ const exportConstant = {
     CHECK_FT_STATUS_API: "/config/toggledFeatures/check?featureName=",
     USER_HUB_API: "/user-management/v1/users",
 
-    EXPORT_FT: "release-wfm-RTACsvExportFromSFDL-CXWFM-30711"
+    EXPORT_FT: "release-wfm-RTACsvExportFromSFDL-CXWFM-30711",
+    EXPIRATION_TIME_MILLISECONDS: 1000 * 60
 };
 exports.getConstants = exportConstant;

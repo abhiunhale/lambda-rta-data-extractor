@@ -19,6 +19,9 @@ function Executor(event, token) {
     let data_lake_bucket = process.env.DATALAKE_BUCKET;
     let tenant = {};
     let isFTOn = false;
+    let s3 = new AWS.S3({
+        apiVersion: "2012-10-17"
+    });
 
     self.verifyFeatureToggleIsOn = async function () {
         await LambdaUtils.performGetRequestToCXone(constants.CHECK_FT_STATUS_API + constants.EXPORT_FT, token, host, true, tenant.schemaName).then((response) => {
@@ -89,9 +92,6 @@ function Executor(event, token) {
     };
 
     self.saveAdherenceFileToS3 = async function (filename, data) {
-        let s3 = new AWS.S3({
-            apiVersion: "2012-10-17"
-        });
         logger.debug("bucket used for upload" + (data_lake_bucket));
         //s3 path : dev-datalake-cluster-bucket-q37evqefmksl/report/export/perm_pm_kepler/adherence/
         let s3FileParams = {
@@ -99,14 +99,27 @@ function Executor(event, token) {
             Key: "report/export/" + tenant.schemaName + "/adherence/" + filename,
             Body: data
         };
-        let fileLocation = "";
+        let fileLocation = {};
 
         await s3.upload(s3FileParams).promise().then((response) => {
-            fileLocation = response.Location;
+            logger.info("File upload response: " + JSON.stringify(response));
+            fileLocation.Bucket = response.Bucket;
+            fileLocation.Key = response.Key;
         }).catch((error) => {
+            console.log(error);
             throw new Error(JSON.stringify(error));
         });
         return fileLocation;
+    };
+
+    self.getS3SignedURL = function (fileLocation) {
+        fileLocation.Expires = constants.EXPIRATION_TIME_MILLISECONDS;
+        return s3.getSignedUrl('getObject', fileLocation);
+    };
+
+    self.getTenant = function () {
+        let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        return decoded_token.tenant;
     };
 }
 
@@ -117,8 +130,8 @@ exports.Executor = Executor;
  */
 
 exports.handler = async (event, context, callback) => {
-    logger.log("event:" + JSON.stringify(event));
     commonUtils.loggerUtils.setDebugMode(process.env.DEBUG);
+    logger.log("event:" + JSON.stringify(event));
     let hasWFMLicense = false;
     let token = "";
     let data;
@@ -131,6 +144,7 @@ exports.handler = async (event, context, callback) => {
         callback(constants.BAD_REQUEST);
     }
     let executor = new Executor(event.body, token);
+    commonUtils.loggerUtils.setDebugMode(process.env.DEBUG, executor.getTenant());
     if (!process.env.SERVICE_URL) {
         logger.error('Fail to validate host from process :' + process.env.SERVICE_URL);
         callback(constants.INTERNAL_ERROR);
@@ -173,7 +187,11 @@ exports.handler = async (event, context, callback) => {
         data = data.map(line => line.join(',')).join('\n');
 
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
-        callback(null, {"url": fileLocation});
+
+        logger.info('8.GET S3 PRESIGNED URL');
+        let url = executor.getS3SignedURL(fileLocation);
+        logger.info("URL:" + url);
+        callback(null, {"url": url});
     } catch (error) {
         logger.error(constants.API_FAILURE + ": " + error);
         callback(constants.INTERNAL_ERROR);

@@ -15,19 +15,24 @@ let executor;
 var mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
 
 describe('WFM RTA export report test', function () {
-    this.timeout(120000);
+    this.timeout(30000);
     var getMockEvent = function (eventData) {
-        return eventData;
+        return JSON.parse(eventData);
     };
 
     beforeEach(function () {
-        mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
-        mockAPIResponse = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockAPIResult.json'))));
+        mockEvent = getMockEvent(JSON.stringify(require('./mocks/mockEvent.json')));
+        mockAPIResponse = getMockEvent(JSON.stringify(require('./mocks/mockAPIResult.json')));
         process.env.DATALAKE_BUCKET = "sample-dl-bucket";
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
+        process.env.DEBUG = true;
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
+            callback(null, data);
+        });
+        AWSMock.mock('S3', 'getSignedUrl', (operation, params, callback) => {
+            let data = "https://abc.csv";
             callback(null, data);
         });
         let token = mockEvent.headers.Authorization.split(" ")[1];
@@ -46,8 +51,11 @@ describe('WFM RTA export report test', function () {
         LambdaTester(Handler)
             .event(mockEvent)
             .expectResult((result) => {
-                expect(result.url).to.exist;
-                done();
+                result.url.promise().then((res) => {
+                    expect(res).to.exist;
+                    expect(res).to.equal("https://abc.csv");
+                    done();
+                });
             })
             .catch(done);
     });
@@ -58,8 +66,7 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify handler failure while request authentication", done => {
-        let errorMsg = {err: 'Invalid token'};
-        performGetRequestToCXoneStub.rejects(errorMsg);
+        performGetRequestToCXoneStub.rejects(constants.INVALID_TOKEN);
         LambdaTester(Handler)
             .event(mockEvent)
             .expectError(result => {
@@ -71,7 +78,7 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify failure in executor authenticate request method", done => {
-        let errorMsg = {err: 'Invalid token'};
+        let errorMsg = {err: constants.INVALID_TOKEN};
         performGetRequestToCXoneStub.rejects(errorMsg);
         executor.authenticateRequest().catch(error => {
             expect(error.message).to.equal(JSON.stringify(errorMsg));
@@ -111,9 +118,9 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify error if the feature toggle is off", done => {
-        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName).onCall(0).returns(Promise.resolve('false'));
 
@@ -128,12 +135,12 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify error if the feature toggle api fails", done => {
-        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
-            .onCall(0).returns(Promise.reject('Invalid Token in API'));
+            .onCall(0).returns(Promise.reject(constants.INVALID_TOKEN));
 
         LambdaTester(Handler)
             .event(mockEvent)
@@ -175,16 +182,29 @@ describe('WFM RTA export report test', function () {
 
     it("Verify executor method returns false when date range is incorrect", async() => {
         let invalidEvent = {
-            "reportName" : "ABC",
-            "reportDateRange" : {
+            "reportName": "ABC",
+            "reportDateRange": {
                 "from": "2022-10-03"
             },
             "evolveAuth": {
-                "token" : "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
             }
         };
-        let executorWithInvalidEvent = new Executor(invalidEvent,{});
+        let executorWithInvalidEvent = new Executor(invalidEvent, {});
         let isEventValid = executorWithInvalidEvent.verifyEvent();
+        expect(isEventValid).to.equal(false);
+
+        invalidEvent = {
+            "reportName": "ABC",
+            "reportDateRange": {
+                "to": "2022-10-03"
+            },
+            "evolveAuth": {
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+            }
+        };
+        executorWithInvalidEvent = new Executor(invalidEvent, {});
+        isEventValid = executorWithInvalidEvent.verifyEvent();
         expect(isEventValid).to.equal(false);
     });
 
@@ -219,14 +239,14 @@ describe('WFM RTA export report test', function () {
     });
 
     it("Verify failure in handler method when users API fails", done => {
-        let featurePath = "/config/toggledFeatures/check?featureName=release-wfm-RTACsvExportFromSFDL-CXWFM-30711";
+        let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs("/tenants/current?sensitive=true", token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(true));
         performGetRequestToCXoneStub.withArgs(constants.USER_HUB_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
-            .onCall(0).returns(Promise.reject('Invalid Token in API'));
+            .onCall(0).returns(Promise.reject(constants.INVALID_TOKEN));
 
         LambdaTester(Handler)
             .event(mockEvent)
@@ -251,11 +271,14 @@ describe('WFM RTA export report  failure test cases', function () {
     var getMockEvent = function (eventData) {
         return eventData;
     };
-
+    let s3Failure = "Fail to upload file to s3";
     beforeEach(function () {
         mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
         process.env.SERVICE_URL = "";
         executor = new Executor(mockEvent, {});
+        AWSMock.mock('S3', 'upload', function (params, callback) {
+            callback(s3Failure, null);
+        });
     });
 
     it("Report export Fail without host", done => {
@@ -270,16 +293,12 @@ describe('WFM RTA export report  failure test cases', function () {
     });
 
     it("Verify failure while uploading file to s3", async () => {
-        let error = "Fail to upload file to s3";
-        let fileName = "ABC.json";
+        let fileName = "ABC.csv";
         let data = "";
-        AWSMock.mock('S3', 'upload', function (params, callback) {
-            callback(error, null);
-        });
         try {
             await executor.saveAdherenceFileToS3(fileName, data);
         } catch (err) {
-            expect(err.message).to.equal(JSON.stringify(error));
+            expect(err.message).to.equal(JSON.stringify(s3Failure));
         }
     });
 });
