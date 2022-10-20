@@ -8,7 +8,7 @@
     "query": [
       {
         "filterName": "schedulingId",
-        "meaningfulValues": [
+        "values": [
           {
             "key": "11e8c2d2-62b0-1df0-935f-0242ac110003",
             "value": "11e8c2d2-62b0-1df0-935f-0242ac110003"

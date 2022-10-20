@@ -117,6 +117,22 @@ describe('WFM RTA export report test', function () {
         expect(hasLicense).to.equal(false);
     });
 
+    it("Verify error in handler when license verification fails", done => {
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        let tenant = {"tenant": {"licenses": []}};
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+            .onCall(0).returns(Promise.resolve(JSON.stringify(tenant)));
+
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.INTERNAL_ERROR);
+                done();
+            })
+            .catch(done);
+    });
+
     it("Verify error if the feature toggle is off", done => {
         let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
@@ -182,7 +198,7 @@ describe('WFM RTA export report test', function () {
 
     it("Verify executor method returns false when date range is incorrect", async() => {
         let invalidEvent = {
-            "reportName": "ABC",
+            "reportName": "adherenceV2",
             "reportDateRange": {
                 "from": "2022-10-03"
             },
@@ -195,7 +211,7 @@ describe('WFM RTA export report test', function () {
         expect(isEventValid).to.equal(false);
 
         invalidEvent = {
-            "reportName": "ABC",
+            "reportName": "adherenceV2",
             "reportDateRange": {
                 "to": "2022-10-03"
             },
@@ -210,21 +226,40 @@ describe('WFM RTA export report test', function () {
 
     it("Verify executor method returns false when query is not present", async() => {
         let invalidEvent = {
-            "reportName" : "ABC",
-            "reportDateRange" : {
+            "reportName": "adherenceV2",
+            "reportDateRange": {
                 "from": "2022-10-03",
-                "to" : "2022-10-03"
+                "to": "2022-10-03"
             },
             "evolveAuth": {
-                "token" : "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
             }
         };
-        let executorWithInvalidEvent = new Executor(invalidEvent,{});
+        let executorWithInvalidEvent = new Executor(invalidEvent, {});
         let isEventValid = executorWithInvalidEvent.verifyEvent();
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns empty list when no users are fetched", async() => {
+    it("Verify failure in handler method when event verification fails", done => {
+        let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
+        let token = mockEvent.headers.Authorization.split(" ")[1];
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+            .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
+        performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
+            .onCall(0).returns(Promise.resolve(true));
+        mockEvent.body = {};
+
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.BAD_REQUEST);
+                done();
+            })
+            .catch(done);
+    });
+
+    it("Verify executor method returns empty list when no users are fetched", async () => {
         let response = mockAPIResponse;
         response.users = [];
         performGetRequestToCXoneStub.resolves(JSON.stringify(response));
@@ -266,14 +301,12 @@ describe('WFM RTA export report test', function () {
 
 });
 
-describe('WFM RTA export report  failure test cases', function () {
+describe('WFM RTA export report failure test cases', function () {
     this.timeout(3000);
-    var getMockEvent = function (eventData) {
-        return eventData;
-    };
+
     let s3Failure = "Fail to upload file to s3";
     beforeEach(function () {
-        mockEvent = getMockEvent(JSON.parse(JSON.stringify(require('./mocks/mockEvent.json'))));
+        mockEvent = JSON.parse(JSON.stringify(require('./mocks/mockEvent.json')));
         process.env.SERVICE_URL = "";
         executor = new Executor(mockEvent, {});
         AWSMock.mock('S3', 'upload', function (params, callback) {
@@ -292,13 +325,36 @@ describe('WFM RTA export report  failure test cases', function () {
             .catch(done);
     });
 
-    it("Verify failure while uploading file to s3", async () => {
+    it("Report export Fail when headers are missing", done => {
+        mockEvent.headers = {};
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.BAD_REQUEST);
+                done();
+            })
+            .catch(done);
+    });
+
+    it("Report export Fail when token is invalid", done => {
+        mockEvent.headers.Authorization = "This is invalid token";
+        LambdaTester(Handler)
+            .event(mockEvent)
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.BAD_REQUEST);
+                done();
+            })
+            .catch(done);
+    });
+
+    it("Verify failure while uploading file to s3", done => {
         let fileName = "ABC.csv";
         let data = "";
-        try {
-            await executor.saveAdherenceFileToS3(fileName, data);
-        } catch (err) {
-            expect(err.message).to.equal(JSON.stringify(s3Failure));
-        }
+        executor.saveAdherenceFileToS3(fileName, data).catch(error => {
+            expect(error.message).to.equal(JSON.stringify(s3Failure));
+            done();
+        });
     });
 });

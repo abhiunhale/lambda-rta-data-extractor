@@ -25,8 +25,10 @@ function Executor(event, token) {
 
     self.verifyFeatureToggleIsOn = async function () {
         await LambdaUtils.performGetRequestToCXone(constants.CHECK_FT_STATUS_API + constants.EXPORT_FT, token, host, true, tenant.schemaName).then((response) => {
+            logger.log("Response of FT API:" + response + "for tenant:" + tenant.schemaName);
             isFTOn = JSON.parse(response);
         }).catch((error) => {
+            logger.log("FT API failure for tenant:" + tenant.schemaName);
             throw new Error(JSON.stringify(error));
         });
         return isFTOn;
@@ -35,7 +37,7 @@ function Executor(event, token) {
     self.authenticateRequest = async function () {
         await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, false).then((response) => {
             tenant = JSON.parse(response).tenant;
-            logger.debug("tenant details: " + JSON.stringify(tenant));
+            logger.log("Successfully authenticated tenant : " + tenant.schemaName);
         }).catch((error) => {
             commonUtils.metricsWriter.addTenantMetricWithDimension(tenant, `LMBD-WFM-export-failures-D:reason`, 'getTenant', 1);
             commonUtils.metricsWriter.flushAggregatedMetrics();
@@ -44,11 +46,12 @@ function Executor(event, token) {
     };
 
     self.verifyWFMLicense = function () {
-        logger.debug("tenant for license verification : " + JSON.stringify(tenant));
+        logger.log("tenant for license verification : " + tenant.schemaName);
         if (tenant && tenant.licenses && tenant.licenses.length > 0) {
             let licenseLen = tenant.licenses.length;
             for (let i = 0; i < licenseLen; i += 1) {
                 if (tenant.licenses[i].applicationId === "WFM") {
+                    logger.log("Successfully verified WFM license for tenant: " + tenant.schemaName)
                     return true;
                 }
             }
@@ -58,14 +61,21 @@ function Executor(event, token) {
     };
 
     self.verifyEvent = function () {
-        logger.debug("event for verification in executor: " + JSON.stringify(event));
+        logger.info("event verification for the tenant:" + tenant.schemaName);
+        logger.debug("event for verification: " + JSON.stringify(event));
         if (!event || !event.reportName || event.reportName !== "adherenceV2") {
+            logger.info("event verification FAILED due to invalid report name");
             return false;
         }
         if (!event.reportDateRange || !event.reportDateRange.from || !event.reportDateRange.to) {
+            logger.info("event verification FAILED due to invalid report date range");
             return false;
         }
-        return !(!event.query || event.query.length <= 0);
+        if (!event.query || event.query.length <= 0) {
+            logger.info("event verification FAILED due to invalid query");
+            return false;
+        }
+        return true;
     };
 
     self.getUsersFromUH = async function () {
@@ -137,7 +147,7 @@ exports.handler = async (event, context, callback) => {
     let data;
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
-    if (event.headers.Authorization && event.headers.Authorization.startsWith("Bearer ")) {
+    if (event.headers && event.headers.Authorization && event.headers.Authorization.indexOf("Bearer ") === 0) {
         token = event.headers.Authorization.split(" ")[1];
     } else {
         logger.error(constants.INVALID_TOKEN + ": " + event.headers.Authorization);
