@@ -12,11 +12,10 @@ var assert = require('assert');
 var mainModule = require('../index.js');
 var LambdaTester = require('lambda-tester');
 var myHandler = mainModule.handler;
-var Executor = mainModule.Executor;
-var sinon = require("sinon");
 var AWS = require('aws-sdk');
 var commonUtils = require('lambda-common-utils');
-var clone = require('clone');
+let constantUtils = require("../ConstantUtils");
+const constants = constantUtils.getConstants;
 
 
 describe('lambda wfm snowflake data export IT', function () {
@@ -61,7 +60,6 @@ describe('lambda wfm snowflake data export IT', function () {
     });
 
     beforeEach(function () {
-
         lambdaEvent = JSON.parse(JSON.stringify(require('../test/mocks/mockEvent.json')));
         lambdaEvent.headers.Authorization = "Bearer " + evolveAuth.token;
     });
@@ -69,8 +67,20 @@ describe('lambda wfm snowflake data export IT', function () {
     it('Run  lambda successfully', function () {
         return LambdaTester(myHandler)
             .event(lambdaEvent)
-            .expectSucceed(function (result) {
+            .expectResult(function (result) {
                 console.log(JSON.stringify(result));
+                expect(result).to.exist;
             });
+    });
+
+
+    it('Failure run for lambda with invalid token', function () {
+        lambdaEvent.headers.Authorization = "";
+        return LambdaTester(myHandler)
+            .event(lambdaEvent)
+            .expectError(error => {
+                expect(error.message).to.exist;
+                expect(error.message).to.equal(constants.BAD_REQUEST);
+            })
     });
 });

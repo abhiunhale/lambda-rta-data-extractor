@@ -51,7 +51,7 @@ function Executor(event, token) {
             let licenseLen = tenant.licenses.length;
             for (let i = 0; i < licenseLen; i += 1) {
                 if (tenant.licenses[i].applicationId === "WFM") {
-                    logger.log("Successfully verified WFM license for tenant: " + tenant.schemaName)
+                    logger.log("Successfully verified WFM license for tenant: " + tenant.schemaName);
                     return true;
                 }
             }
@@ -129,7 +129,10 @@ function Executor(event, token) {
 
     self.getTenant = function () {
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-        return decoded_token.tenant;
+        let schemaName = decoded_token.tenant;
+        if (schemaName === 'wfo_master' && (process.env.AWS_PROFILE === "dev") || process.env.AWS_PROFILE === "test")
+            schemaName = "perm_lambda_IT";
+        return schemaName;
     };
 }
 

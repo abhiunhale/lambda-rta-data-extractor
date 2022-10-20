@@ -12,11 +12,11 @@ const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
 let executor;
-var mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
+let mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
 
 describe('WFM RTA export report test', function () {
     this.timeout(30000);
-    var getMockEvent = function (eventData) {
+    let getMockEvent = function (eventData) {
         return JSON.parse(eventData);
     };
 
@@ -276,7 +276,7 @@ describe('WFM RTA export report test', function () {
     it("Verify failure in handler method when users API fails", done => {
         let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(true));
