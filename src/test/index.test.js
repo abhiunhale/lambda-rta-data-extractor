@@ -120,7 +120,7 @@ describe('WFM RTA export report test', function () {
     it("Verify error in handler when license verification fails", done => {
         let token = mockEvent.headers.Authorization.split(" ")[1];
         let tenant = {"tenant": {"licenses": []}};
-        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(JSON.stringify(tenant)));
 
         LambdaTester(Handler)
@@ -136,7 +136,7 @@ describe('WFM RTA export report test', function () {
     it("Verify error if the feature toggle is off", done => {
         let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName).onCall(0).returns(Promise.resolve('false'));
 
@@ -153,7 +153,7 @@ describe('WFM RTA export report test', function () {
     it("Verify error if the feature toggle api fails", done => {
         let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.reject(constants.INVALID_TOKEN));
@@ -243,7 +243,7 @@ describe('WFM RTA export report test', function () {
     it("Verify failure in handler method when event verification fails", done => {
         let featurePath = constants.CHECK_FT_STATUS_API + constants.EXPORT_FT;
         let token = mockEvent.headers.Authorization.split(" ")[1];
-        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, false)
+        performGetRequestToCXoneStub.withArgs(constants.CURRENT_API, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(JSON.stringify(mockAPIResponse)));
         performGetRequestToCXoneStub.withArgs(featurePath, token, process.env.SERVICE_URL, true, mockAPIResponse.tenant.schemaName)
             .onCall(0).returns(Promise.resolve(true));

@@ -35,7 +35,7 @@ function Executor(event, token) {
     };
 
     self.authenticateRequest = async function () {
-        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, false).then((response) => {
+        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, true, self.getTenant()).then((response) => {
             tenant = JSON.parse(response).tenant;
             logger.log("Successfully authenticated tenant : " + tenant.schemaName);
         }).catch((error) => {
@@ -148,6 +148,7 @@ exports.handler = async (event, context, callback) => {
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
     if (event.headers && event.headers.Authorization && event.headers.Authorization.indexOf("Bearer ") === 0) {
+        logger.log("Headers verified successfully");
         token = event.headers.Authorization.split(" ")[1];
     } else {
         logger.error(constants.INVALID_TOKEN + ": " + event.headers.Authorization);
