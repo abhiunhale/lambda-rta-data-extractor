@@ -111,9 +111,17 @@ Resources:
                     #end }
                     }"
           IntegrationResponses:
-            - StatusCode: "200"
+            - StatusCode: 200
+            -
+                SelectionPattern : "Bad Request was provided"
+                StatusCode: 400
+            -
+                SelectionPattern : "Internal Server Error"
+                StatusCode: 500
         MethodResponses:
-          - StatusCode: "200"
+          - StatusCode: 200
+          - StatusCode: 400
+          - StatusCode: 500
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
@@ -123,7 +131,7 @@ Resources:
         - apiGatewayRootMethod
       Properties:
         RestApiId: !Ref apiGateway
-        StageName: !Ref EnvironmentType
+        StageName: !Ref WFMExportSFDataGatewayStageName
 
   lambdaApiGatewayInvoke:
     Type: AWS::Lambda::Permission
