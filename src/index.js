@@ -11,6 +11,7 @@ let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 let constantUtils = require("./ConstantUtils");
 const constants = constantUtils.getConstants;
+const snowflake = require('snowflake-sdk');
 
 function Executor(event, token) {
 
@@ -134,6 +135,38 @@ function Executor(event, token) {
             schemaName = "perm_lambda_IT";
         return schemaName;
     };
+
+    var connection = snowflake.createConnection({
+        account: "cxone_na1_dev",
+        username: "Omprakash_Suthar",
+        password: "O123456s",
+        application: "WFM-Extract-Service"
+    });
+
+    self.fetchDataSnowflake = async function () {
+        let connection_ID;
+
+        connection.connect(
+            function (err, conn) {
+                if (err) {
+                    console.error('Unable to connect: ' + err.message);
+                } else {
+                    console.log('Successfully connected to Snowflake.');
+                    connection_ID = conn.getId();
+                }
+            }
+        );
+
+        let sqlText = "query here";
+
+        await self.checkRecords(connection, sqlText).then((response) => {
+            logger.log("response from execute sql : " + JSON.stringify(response));
+        }).catch((error) => {
+            logger.log("error in statement execution" + error);
+        });
+
+    };
+
 }
 
 exports.Executor = Executor;
