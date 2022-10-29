@@ -36,11 +36,11 @@ function Executor(event, token) {
     };
 
     self.authenticateRequest = async function () {
-        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, true, self.getTenant()).then((response) => {
+        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, true, self.getTenantSchemaName()).then((response) => {
             tenant = JSON.parse(response).tenant;
             logger.log("Successfully authenticated tenant : " + tenant.schemaName);
         }).catch((error) => {
-            commonUtils.metricsWriter.addTenantMetricWithDimension(tenant, `LMBD-WFM-export-failures-D:reason`, 'getTenant', 1);
+            commonUtils.metricsWriter.addTenantMetricWithDimension(tenant, `LMBD-WFM-export-failures-D:reason`, 'getTenantSchemaName', 1);
             commonUtils.metricsWriter.flushAggregatedMetrics();
             throw new Error(JSON.stringify(error));
         });
@@ -93,6 +93,20 @@ function Executor(event, token) {
         return userIds;
     };
 
+    self.getSchedulingUnits = function () {
+        let schedulingUnitIds = [];
+        let queries = event.query;
+        queries.forEach(function (query) {
+            if (query.filterName === 'schedulingId') {
+                let values = query.values;
+                values.forEach(function (value) {
+                    schedulingUnitIds.push(value.key);
+                });
+            }
+        });
+        return schedulingUnitIds;
+    };
+
     self.generateFileName = function () {
         //sample file name : 20221007155945_pm.kepler.administrator@wfosaas.com.csv
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -128,7 +142,7 @@ function Executor(event, token) {
         return s3.getSignedUrl('getObject', fileLocation);
     };
 
-    self.getTenant = function () {
+    self.getTenantSchemaName = function () {
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
         let schemaName = decoded_token.tenant;
         if (schemaName === 'wfo_master' && (process.env.AWS_PROFILE === "dev") || process.env.AWS_PROFILE === "test")
@@ -136,35 +150,73 @@ function Executor(event, token) {
         return schemaName;
     };
 
-    var connection = snowflake.createConnection({
-        account: "cxone_na1_dev",
-        username: "Omprakash_Suthar",
-        password: "O123456s",
-        application: "WFM-Extract-Service"
-    });
+    self.getTenantId = function () {
+        return tenant.tenantId;
+    };
 
-    self.fetchDataSnowflake = async function () {
+
+    self.fetchDataSnowflake = async function (paramObject) {
         let connection_ID;
+        let tenantId = paramObject.tenantId;
+        let schedulingUnitId = paramObject.schedulingUnits;
+        let userId = paramObject.userIds;
+        let suStartDate = paramObject.suStartDate;
+        let suEndDate = paramObject.suEndDate;
+        let rows = [];
+
+        let connection = snowflake.createConnection({
+            account: "cxone_na1_dev",
+            username: "Omprakash_Suthar",
+            password: "O123456s",
+            application: "WFM-Extract-Service"
+        });
 
         connection.connect(
             function (err, conn) {
+                console.log('CALLING CONNECTION');
                 if (err) {
-                    console.error('Unable to connect: ' + err.message);
+                    logger.error('Unable to connect: ' + err.message);
                 } else {
-                    console.log('Successfully connected to Snowflake.');
+                    logger.info('Successfully connected to Snowflake.');
                     connection_ID = conn.getId();
                 }
             }
         );
 
-        let sqlText = "query here";
-
-        await self.checkRecords(connection, sqlText).then((response) => {
-            logger.log("response from execute sql : " + JSON.stringify(response));
-        }).catch((error) => {
-            logger.log("error in statement execution" + error);
+        let statement = connection.execute({
+            sqlText: fs.readFileSync('./resources/FetchRTASnowflake.sql').toString(),
+            binds: [tenantId, schedulingUnitId, userId, suStartDate, suEndDate],
+            complete: function(err, stmt, rows) {
+                if (err) {
+                    logger.error('Failed to execute statement due to the following error: ' + err.message);
+                } else {
+                    logger.info('Successfully executed statement: ' + stmt.getSqlText());
+                }
+            }
         });
 
+        logger.info('Statement is '+statement);
+        let stream = statement.streamRows();
+
+        stream.on('error', function(err) {
+            logger.error('Unable to consume all rows');
+        });
+        stream.on('data', function(row) {
+            rows.push(row);
+        });
+        stream.on('end', function() {
+            logger.info('All rows consumed');
+        });
+
+        connection.destroy(function(err, conn) {
+            if (err) {
+                logger.error('Unable to disconnect: ' + err.message);
+            } else {
+                logger.info('Disconnected connection with id: ' + connection.getId());
+            }
+        });
+
+        return rows;
     };
 
 }
@@ -181,6 +233,7 @@ exports.handler = async (event, context, callback) => {
     let hasWFMLicense = false;
     let token = "";
     let data;
+    let fetchDataSFObject = {};
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
     if (event.headers && event.headers.Authorization && event.headers.Authorization.indexOf("Bearer ") === 0) {
@@ -191,7 +244,7 @@ exports.handler = async (event, context, callback) => {
         callback(constants.BAD_REQUEST);
     }
     let executor = new Executor(event.body, token);
-    commonUtils.loggerUtils.setDebugMode(process.env.DEBUG, executor.getTenant());
+    commonUtils.loggerUtils.setDebugMode(process.env.DEBUG, executor.getTenantSchemaName());
     if (!process.env.SERVICE_URL) {
         logger.error('Fail to validate host from process :' + process.env.SERVICE_URL);
         callback(constants.INTERNAL_ERROR);
@@ -224,6 +277,16 @@ exports.handler = async (event, context, callback) => {
 
         logger.info('5. GET LIST OF USER IDs');
         let userIds = await executor.getUsersFromUH();
+
+        // SF data fetch
+        logger.info('Fetch data from SF');
+        fetchDataSFObject['tenantId'] = executor.getTenantId();
+        fetchDataSFObject['schedulingUnits'] = executor.getSchedulingUnits();
+        fetchDataSFObject['userIds'] = userIds;
+        fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
+        fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
+        let resultRows = executor.fetchDataSnowflake(fetchDataSFObject);
+        console.log('Result is :'+ resultRows.toString());
 
         logger.info('6. GENERATE NAME FOR CSV FILE');
         let filename = executor.generateFileName();
