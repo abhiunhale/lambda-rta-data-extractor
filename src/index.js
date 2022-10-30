@@ -1,6 +1,8 @@
 'use strict';
 
 let AWS = require('aws-sdk');
+let snowflake = require('snowflake-sdk');
+const { Parser } = require('json2csv');
 const getStream = require('get-stream');
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +13,6 @@ let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 let constantUtils = require("./ConstantUtils");
 const constants = constantUtils.getConstants;
-const snowflake = require('snowflake-sdk');
 
 function Executor(event, token) {
 
@@ -154,70 +155,103 @@ function Executor(event, token) {
         return tenant.tenantId;
     };
 
-
-    self.fetchDataSnowflake = async function (paramObject) {
+    self.fetchDataFromSnowflake = async function (paramObject) {
         let connection_ID;
+        let responseRows;
+        let sqlText;
         let tenantId = paramObject.tenantId;
-        let schedulingUnitId = paramObject.schedulingUnits;
-        let userId = paramObject.userIds;
+        let schedulingUnitId = paramObject.schedulingUnits.map(d => `'${d}'`).join(',');
+        let userId = paramObject.userIds.map(d => `'${d}'`).join(',');
         let suStartDate = paramObject.suStartDate;
         let suEndDate = paramObject.suEndDate;
-        let rows = [];
 
         let connection = snowflake.createConnection({
             account: "cxone_na1_dev",
-            username: "Omprakash_Suthar",
-            password: "O123456s",
+            username: "WFM_DATA_EXTRACT_MS",
+            password: "gICW#U48xm46JJzA",
             application: "WFM-Extract-Service"
         });
 
         connection.connect(
             function (err, conn) {
-                console.log('CALLING CONNECTION');
                 if (err) {
-                    logger.error('Unable to connect: ' + err.message);
+                    console.error('Unable to connect: ' + err.message);
                 } else {
-                    logger.info('Successfully connected to Snowflake.');
+                    console.log('Successfully connected to Snowflake.');
+                    // Optional: store the connection ID.
                     connection_ID = conn.getId();
                 }
             }
         );
 
-        let statement = connection.execute({
-            sqlText: fs.readFileSync('./resources/FetchRTASnowflake.sql').toString(),
-            binds: [tenantId, schedulingUnitId, userId, suStartDate, suEndDate],
-            complete: function(err, stmt, rows) {
-                if (err) {
-                    logger.error('Failed to execute statement due to the following error: ' + err.message);
-                } else {
-                    logger.info('Successfully executed statement: ' + stmt.getSqlText());
-                }
-            }
+        connection.execute({
+            sqlText: 'USE WAREHOUSE REPORTS_WH;'
         });
 
-        logger.info('Statement is '+statement);
-        let stream = statement.streamRows();
+        sqlText = "select concat(userDim.USER_FIRST_NAME,' ',userDim.USER_LAST_NAME) as agent , SUSCD.SCHEDULING_UNIT_TIMEZONE as time_zone , adherence_fact.PUBLISHED_FLAG , SUSCD.SCHEDULING_UNIT_NAME , adherence_fact.SU_START_DATE_ID as From_date , adherence_fact.SU_START_TIME_ID as From_time , adherence_fact.SU_END_DATE_ID as To_date , adherence_fact.SU_END_TIME_ID as to_time , activityDim.ACTIVITY_NAME as Scheduled_activity , agentActivity.WFM_AGENT_STATE_NAME as actual_activity , adherence_fact.IN_ADHERENCE_SECONDS as in_adherence , adherence_fact.OUT_OF_ADHERENCE_SECONDS as out_adherence from ( select USER_ID , SCHEDULING_UNIT_ID , SCHEDULED_ACTIVITY_ID , ACTUAL_WFM_AGENT_STATE_ID , to_varchar(SU_START_DATE_ID::date, \'mon dd, yyyy\') as SU_START_DATE_ID , SU_START_TIME_ID , to_varchar(SU_END_DATE_ID::date, \'mon dd, yyyy\') as SU_END_DATE_ID , SU_END_TIME_ID , TO_TIME(TO_TIMESTAMP_NTZ(IN_ADHERENCE_SECONDS)) AS IN_ADHERENCE_SECONDS , TO_TIME(TO_TIMESTAMP_NTZ(OUT_OF_ADHERENCE_SECONDS)) AS OUT_OF_ADHERENCE_SECONDS, PUBLISHED_FLAG , _tenant_id from DATAHUB.WFM_REFINED.ADHERENCE_DETAIL_FACT where _tenant_id = '"+tenantId+"' and SCHEDULING_UNIT_ID in ("+schedulingUnitId+") and USER_ID in ("+userId+") and SU_START_DATE_ID >= '"+suStartDate+"' and SU_END_DATE_ID <= '"+suEndDate+"' ) as adherence_fact inner join DATAHUB.USERHUB_REFINED.USER_SCD_DIM userDim on userDim.USER_ID = adherence_fact.USER_ID and userDim._tenant_id = adherence_fact._tenant_id and userDim.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.SCHEDULING_UNIT_SCD_DIM SUSCD on SUSCD.SCHEDULING_UNIT_ID = adherence_fact.SCHEDULING_UNIT_ID and suscd._tenant_id = adherence_fact._tenant_id and suscd.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.ACTIVITY_DIM activityDim on activityDim.ACTIVITY_ID = adherence_fact.SCHEDULED_ACTIVITY_ID and activityDim._tenant_id = adherence_fact._tenant_id inner join DATAHUB.WFM_REFINED.WFM_AGENT_STATE_SCD_DIM agentActivity on agentActivity.WFM_AGENT_STATE_ID = adherence_fact.ACTUAL_WFM_AGENT_STATE_ID and agentActivity._tenant_id = adherence_fact._tenant_id and agentActivity.CURRENT_FLAG = true";
 
-        stream.on('error', function(err) {
-            logger.error('Unable to consume all rows');
-        });
-        stream.on('data', function(row) {
-            rows.push(row);
-        });
-        stream.on('end', function() {
-            logger.info('All rows consumed');
+        await self.checkRecords(connection, sqlText, paramObject).then((response) => {
+            responseRows = JSON.parse(response);
+            logger.log("response from execute sql : " + JSON.stringify(response));
+        }).catch((error) => {
+            logger.log("error in statement execution" + error);
         });
 
         connection.destroy(function(err, conn) {
             if (err) {
-                logger.error('Unable to disconnect: ' + err.message);
+                console.error('Unable to disconnect: ' + err.message);
             } else {
-                logger.info('Disconnected connection with id: ' + connection.getId());
+                console.log('Disconnected connection with id: ' + connection.getId());
             }
         });
 
-        return rows;
+        return responseRows;
+
     };
+
+    self.checkRecords = async function (conn, sqlText) {
+        return new Promise((resolve, reject) => {
+            try {
+                conn.execute({
+                    sqlText: sqlText,
+                    complete: function (err, stmt, rows) {
+                        if (err) {
+                            logger.info(`${stmt.getSqlText()} : ${err.code}`);
+                            reject(0);
+                        }else{
+                            resolve(rows);
+                        }
+                    }
+                });
+            } catch (err) {
+                error(err);
+            }
+        });
+    }
+
+    self.convertSFRowsToCSV = function(data){
+        let jsonRows = JSON.parse(data);
+        let fields = [
+            {label: 'Agent', value: 'AGENT'},
+            {label: 'Time Zone', value: 'TIME_ZONE'},
+            {label: 'Published Schedule', value: 'PUBLISHED_FLAG'},
+            {label: 'Scheduling Unit', value: 'SCHEDULING_UNIT_NAME'},
+            {label: 'From (Date)', value: 'FROM_DATE'},
+            {label: 'From (Time)', value: 'FROM_TIME'},
+            {label: 'From (Time)', value: 'TO_DATE'},
+            {label: 'To (Time)', value: 'TO_TIME'},
+            {label: 'Scheduled Activity', value: 'SCHEDULED_ACTIVITY'},
+            {label: 'Actual Activity', value: 'ACTUAL_ACTIVITY'},
+            {label: 'In Adherence', value: 'IN_ADHERENCE'},
+            {label: 'Out of Adherence', value: 'OUT_ADHERENCE'}
+        ];
+
+        let json2csvParser = new Parser({ fields });
+        let csv = json2csvParser.parse(myCars);
+
+        return csv;
+    };
+
 
 }
 
@@ -285,16 +319,88 @@ exports.handler = async (event, context, callback) => {
         fetchDataSFObject['userIds'] = userIds;
         fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
         fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
-        let resultRows = executor.fetchDataSnowflake(fetchDataSFObject);
-        console.log('Result is :'+ resultRows.toString());
+        let resultRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
+        console.log('Result is :' + resultRows);
 
         logger.info('6. GENERATE NAME FOR CSV FILE');
         let filename = executor.generateFileName();
-
+        logger.info('FILE NAME :'+filename);
         logger.info('7. UPLOAD FILE TO S3');
-        const parseStream = parse({delimiter: ","});
-        data = await getStream.array(fs.createReadStream(path.join(__dirname, "./test/mocks/mockAdherence.csv")).pipe(parseStream));
-        data = data.map(line => line.join(',')).join('\n');
+        let resdd = [
+            {
+                "AGENT": "Mars134 Demo1",
+                "TIME_ZONE": "America/New_York",
+                "PUBLISHED_FLAG": true,
+                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
+                "FROM_DATE": "Apr 04, 2020",
+                "FROM_TIME": "00:00:00",
+                "TO_DATE": "Apr 04, 2020",
+                "TO_TIME": "23:59:00",
+                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
+                "ACTUAL_ACTIVITY": "Unknown",
+                "IN_ADHERENCE": "23:59:59",
+                "OUT_ADHERENCE": "00:00:00"
+            },
+            {
+                "AGENT": "Mars134 Demo1",
+                "TIME_ZONE": "America/New_York",
+                "PUBLISHED_FLAG": true,
+                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
+                "FROM_DATE": "Apr 03, 2020",
+                "FROM_TIME": "00:00:00",
+                "TO_DATE": "Apr 03, 2020",
+                "TO_TIME": "23:59:00",
+                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
+                "ACTUAL_ACTIVITY": "Unknown",
+                "IN_ADHERENCE": "23:59:59",
+                "OUT_ADHERENCE": "00:00:00"
+            },
+            {
+                "AGENT": "Mars134 Demo1",
+                "TIME_ZONE": "America/New_York",
+                "PUBLISHED_FLAG": true,
+                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
+                "FROM_DATE": "Apr 02, 2020",
+                "FROM_TIME": "00:00:00",
+                "TO_DATE": "Apr 02, 2020",
+                "TO_TIME": "23:59:00",
+                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
+                "ACTUAL_ACTIVITY": "Unknown",
+                "IN_ADHERENCE": "23:59:59",
+                "OUT_ADHERENCE": "00:00:00"
+            },
+            {
+                "AGENT": "Mars134 Demo1",
+                "TIME_ZONE": "America/New_York",
+                "PUBLISHED_FLAG": true,
+                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
+                "FROM_DATE": "Apr 01, 2020",
+                "FROM_TIME": "00:00:00",
+                "TO_DATE": "Apr 01, 2020",
+                "TO_TIME": "23:59:00",
+                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
+                "ACTUAL_ACTIVITY": "Unknown",
+                "IN_ADHERENCE": "23:59:59",
+                "OUT_ADHERENCE": "00:00:00"
+            },
+            {
+                "AGENT": "Mars134 Demo1",
+                "TIME_ZONE": "America/New_York",
+                "PUBLISHED_FLAG": true,
+                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
+                "FROM_DATE": "Apr 05, 2020",
+                "FROM_TIME": "00:00:00",
+                "TO_DATE": "Apr 05, 2020",
+                "TO_TIME": "23:59:00",
+                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
+                "ACTUAL_ACTIVITY": "Unknown",
+                "IN_ADHERENCE": "23:59:59",
+                "OUT_ADHERENCE": "00:00:00"
+            }
+        ];
+        let csvData = executor.convertSFRowsToCSV(resdd);
+        logger.info('CSV '+csvData);
+
 
         let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
 

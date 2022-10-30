@@ -29,11 +29,11 @@ from
     from
             DATAHUB.WFM_REFINED.ADHERENCE_DETAIL_FACT
             where
-                        _tenant_id = :tenantId
-                and     SCHEDULING_UNIT_ID in :schedulingUnitId
-                and     USER_ID            in :userId
-                and     SU_START_DATE_ID >= :suStartDate
-                and     SU_END_DATE_ID   <= :suEndDate ) as adherence_fact
+                        _tenant_id = ?
+                and     SCHEDULING_UNIT_ID in (?)
+                and     USER_ID            in (?)
+                and     SU_START_DATE_ID >= (?)
+                and     SU_END_DATE_ID   <= (?) ) as adherence_fact
         inner join
     DATAHUB.USERHUB_REFINED.USER_SCD_DIM userDim
     on

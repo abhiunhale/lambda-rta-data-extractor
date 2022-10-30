@@ -20,7 +20,8 @@
     "promise.allsettled": "^1.0.2",
     "request": "^2.79.0",
     "request-promise": "^4.2.2",
-    "snowflake-sdk": "^1.6.15"
+    "snowflake-sdk": "^1.6.15",
+    "json2csv": "^5.0.7"
   },
   "devDependencies": {
     "aws-sdk": "^2.7.20",
