@@ -246,7 +246,7 @@ function Executor(event, token) {
             {label: 'Scheduling Unit', value: 'SCHEDULING_UNIT_NAME'},
             {label: 'From (Date)', value: 'FROM_DATE'},
             {label: 'From (Time)', value: 'FROM_TIME'},
-            {label: 'From (Time)', value: 'TO_DATE'},
+            {label: 'To (Date)', value: 'TO_DATE'},
             {label: 'To (Time)', value: 'TO_TIME'},
             {label: 'Scheduled Activity', value: 'SCHEDULED_ACTIVITY'},
             {label: 'Actual Activity', value: 'ACTUAL_ACTIVITY'},
@@ -255,11 +255,11 @@ function Executor(event, token) {
         ];
 
         if (jsonRows === 0) {
-            let response;
+            let response = " ";
             fields.forEach(function (field) {
-                response = field.label + ',';
+                response = response + ',' + field.label;
             });
-            return response.substring(0, response.length - 2);
+            return response.substring(2, response.length);
         }
         let json2csvParser = new Parser({fields});
 
