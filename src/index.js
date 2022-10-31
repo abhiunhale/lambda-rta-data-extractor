@@ -2,7 +2,7 @@
 
 let AWS = require('aws-sdk');
 let snowflake = require('snowflake-sdk');
-const { Parser } = require('json2csv');
+const {Parser} = require('json2csv');
 const getStream = require('get-stream');
 const fs = require('fs');
 const path = require('path');
@@ -12,6 +12,7 @@ let LambdaUtils = require('./LambdaUtils.js');
 let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 let constantUtils = require("./ConstantUtils");
+const {queryParams} = require("./resources/queryParams");
 const constants = constantUtils.getConstants;
 
 function Executor(event, token) {
@@ -188,7 +189,10 @@ function Executor(event, token) {
             sqlText: 'USE WAREHOUSE REPORTS_WH;'
         });
 
-        sqlText = "select concat(userDim.USER_FIRST_NAME,' ',userDim.USER_LAST_NAME) as agent , SUSCD.SCHEDULING_UNIT_TIMEZONE as time_zone , adherence_fact.PUBLISHED_FLAG , SUSCD.SCHEDULING_UNIT_NAME , adherence_fact.SU_START_DATE_ID as From_date , adherence_fact.SU_START_TIME_ID as From_time , adherence_fact.SU_END_DATE_ID as To_date , adherence_fact.SU_END_TIME_ID as to_time , activityDim.ACTIVITY_NAME as Scheduled_activity , agentActivity.WFM_AGENT_STATE_NAME as actual_activity , adherence_fact.IN_ADHERENCE_SECONDS as in_adherence , adherence_fact.OUT_OF_ADHERENCE_SECONDS as out_adherence from ( select USER_ID , SCHEDULING_UNIT_ID , SCHEDULED_ACTIVITY_ID , ACTUAL_WFM_AGENT_STATE_ID , to_varchar(SU_START_DATE_ID::date, \'mon dd, yyyy\') as SU_START_DATE_ID , SU_START_TIME_ID , to_varchar(SU_END_DATE_ID::date, \'mon dd, yyyy\') as SU_END_DATE_ID , SU_END_TIME_ID , TO_TIME(TO_TIMESTAMP_NTZ(IN_ADHERENCE_SECONDS)) AS IN_ADHERENCE_SECONDS , TO_TIME(TO_TIMESTAMP_NTZ(OUT_OF_ADHERENCE_SECONDS)) AS OUT_OF_ADHERENCE_SECONDS, PUBLISHED_FLAG , _tenant_id from DATAHUB.WFM_REFINED.ADHERENCE_DETAIL_FACT where _tenant_id = '"+tenantId+"' and SCHEDULING_UNIT_ID in ("+schedulingUnitId+") and USER_ID in ("+userId+") and SU_START_DATE_ID >= '"+suStartDate+"' and SU_END_DATE_ID <= '"+suEndDate+"' ) as adherence_fact inner join DATAHUB.USERHUB_REFINED.USER_SCD_DIM userDim on userDim.USER_ID = adherence_fact.USER_ID and userDim._tenant_id = adherence_fact._tenant_id and userDim.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.SCHEDULING_UNIT_SCD_DIM SUSCD on SUSCD.SCHEDULING_UNIT_ID = adherence_fact.SCHEDULING_UNIT_ID and suscd._tenant_id = adherence_fact._tenant_id and suscd.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.ACTIVITY_DIM activityDim on activityDim.ACTIVITY_ID = adherence_fact.SCHEDULED_ACTIVITY_ID and activityDim._tenant_id = adherence_fact._tenant_id inner join DATAHUB.WFM_REFINED.WFM_AGENT_STATE_SCD_DIM agentActivity on agentActivity.WFM_AGENT_STATE_ID = adherence_fact.ACTUAL_WFM_AGENT_STATE_ID and agentActivity._tenant_id = adherence_fact._tenant_id and agentActivity.CURRENT_FLAG = true";
+        sqlText = queryParams.part1 + tenantId + queryParams.part2 + schedulingUnitId +
+            queryParams.part3 + userId + queryParams.part4 + suStartDate +
+            queryParams.part5 + suEndDate + queryParams.part6;
+            //"select concat(userDim.USER_FIRST_NAME,' ',userDim.USER_LAST_NAME) as agent , SUSCD.SCHEDULING_UNIT_TIMEZONE as time_zone , adherence_fact.PUBLISHED_FLAG , SUSCD.SCHEDULING_UNIT_NAME , adherence_fact.SU_START_DATE_ID as From_date , adherence_fact.SU_START_TIME_ID as From_time , adherence_fact.SU_END_DATE_ID as To_date , adherence_fact.SU_END_TIME_ID as to_time , activityDim.ACTIVITY_NAME as Scheduled_activity , agentActivity.WFM_AGENT_STATE_NAME as actual_activity , adherence_fact.IN_ADHERENCE_SECONDS as in_adherence , adherence_fact.OUT_OF_ADHERENCE_SECONDS as out_adherence from ( select USER_ID , SCHEDULING_UNIT_ID , SCHEDULED_ACTIVITY_ID , ACTUAL_WFM_AGENT_STATE_ID , to_varchar(SU_START_DATE_ID::date, \'mon dd, yyyy\') as SU_START_DATE_ID , SU_START_TIME_ID , to_varchar(SU_END_DATE_ID::date, \'mon dd, yyyy\') as SU_END_DATE_ID , SU_END_TIME_ID , TO_TIME(TO_TIMESTAMP_NTZ(IN_ADHERENCE_SECONDS)) AS IN_ADHERENCE_SECONDS , TO_TIME(TO_TIMESTAMP_NTZ(OUT_OF_ADHERENCE_SECONDS)) AS OUT_OF_ADHERENCE_SECONDS, PUBLISHED_FLAG , _tenant_id from DATAHUB.WFM_REFINED.ADHERENCE_DETAIL_FACT where _tenant_id = '" + tenantId + "' and SCHEDULING_UNIT_ID in (" + schedulingUnitId + ") and USER_ID in (" + userId + ") and SU_START_DATE_ID >= '" + suStartDate + "' and SU_END_DATE_ID <= '" + suEndDate + "' ) as adherence_fact inner join DATAHUB.USERHUB_REFINED.USER_SCD_DIM userDim on userDim.USER_ID = adherence_fact.USER_ID and userDim._tenant_id = adherence_fact._tenant_id and userDim.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.SCHEDULING_UNIT_SCD_DIM SUSCD on SUSCD.SCHEDULING_UNIT_ID = adherence_fact.SCHEDULING_UNIT_ID and suscd._tenant_id = adherence_fact._tenant_id and suscd.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.ACTIVITY_DIM activityDim on activityDim.ACTIVITY_ID = adherence_fact.SCHEDULED_ACTIVITY_ID and activityDim._tenant_id = adherence_fact._tenant_id inner join DATAHUB.WFM_REFINED.WFM_AGENT_STATE_SCD_DIM agentActivity on agentActivity.WFM_AGENT_STATE_ID = adherence_fact.ACTUAL_WFM_AGENT_STATE_ID and agentActivity._tenant_id = adherence_fact._tenant_id and agentActivity.CURRENT_FLAG = true";
 
         await self.checkRecords(connection, sqlText, paramObject).then((response) => {
             responseRows = JSON.parse(response);
@@ -197,7 +201,7 @@ function Executor(event, token) {
             logger.log("error in statement execution" + error);
         });
 
-        connection.destroy(function(err, conn) {
+        connection.destroy(function (err, conn) {
             if (err) {
                 console.error('Unable to disconnect: ' + err.message);
             } else {
@@ -218,8 +222,13 @@ function Executor(event, token) {
                         if (err) {
                             logger.info(`${stmt.getSqlText()} : ${err.code}`);
                             reject(0);
-                        }else{
-                            resolve(rows);
+                        } else {
+                            if (rows.length > 1) {
+                                resolve(rows);
+                            } else {
+                                logger.info(`${sqlText} No rows were returned.`);
+                                resolve(0);
+                            }
                         }
                     }
                 });
@@ -229,8 +238,8 @@ function Executor(event, token) {
         });
     }
 
-    self.convertSFRowsToCSV = function(data){
-        let jsonRows = JSON.parse(data);
+    self.convertSFResultToCSV = function (data) {
+        let jsonRows = data;
         let fields = [
             {label: 'Agent', value: 'AGENT'},
             {label: 'Time Zone', value: 'TIME_ZONE'},
@@ -246,10 +255,16 @@ function Executor(event, token) {
             {label: 'Out of Adherence', value: 'OUT_ADHERENCE'}
         ];
 
-        let json2csvParser = new Parser({ fields });
-        let csv = json2csvParser.parse(myCars);
+        if (jsonRows === 0) {
+            let response;
+            fields.forEach(function (field) {
+                response = field.label + ',';
+            });
+            return response.substring(0, response.length - 2);
+        }
+        let json2csvParser = new Parser({fields});
 
-        return csv;
+        return json2csvParser.parse(jsonRows);
     };
 
 
@@ -266,7 +281,6 @@ exports.handler = async (event, context, callback) => {
     logger.log("event:" + JSON.stringify(event));
     let hasWFMLicense = false;
     let token = "";
-    let data;
     let fetchDataSFObject = {};
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
@@ -312,99 +326,23 @@ exports.handler = async (event, context, callback) => {
         logger.info('5. GET LIST OF USER IDs');
         let userIds = await executor.getUsersFromUH();
 
-        // SF data fetch
-        logger.info('Fetch data from SF');
+        logger.info('6. FETCH DATA FROM SF.');
         fetchDataSFObject['tenantId'] = executor.getTenantId();
         fetchDataSFObject['schedulingUnits'] = executor.getSchedulingUnits();
         fetchDataSFObject['userIds'] = userIds;
         fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
         fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
         let resultRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
-        console.log('Result is :' + resultRows);
 
-        logger.info('6. GENERATE NAME FOR CSV FILE');
+        logger.info('7. GENERATE NAME FOR CSV FILE');
         let filename = executor.generateFileName();
-        logger.info('FILE NAME :'+filename);
-        logger.info('7. UPLOAD FILE TO S3');
-        let resdd = [
-            {
-                "AGENT": "Mars134 Demo1",
-                "TIME_ZONE": "America/New_York",
-                "PUBLISHED_FLAG": true,
-                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
-                "FROM_DATE": "Apr 04, 2020",
-                "FROM_TIME": "00:00:00",
-                "TO_DATE": "Apr 04, 2020",
-                "TO_TIME": "23:59:00",
-                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
-                "ACTUAL_ACTIVITY": "Unknown",
-                "IN_ADHERENCE": "23:59:59",
-                "OUT_ADHERENCE": "00:00:00"
-            },
-            {
-                "AGENT": "Mars134 Demo1",
-                "TIME_ZONE": "America/New_York",
-                "PUBLISHED_FLAG": true,
-                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
-                "FROM_DATE": "Apr 03, 2020",
-                "FROM_TIME": "00:00:00",
-                "TO_DATE": "Apr 03, 2020",
-                "TO_TIME": "23:59:00",
-                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
-                "ACTUAL_ACTIVITY": "Unknown",
-                "IN_ADHERENCE": "23:59:59",
-                "OUT_ADHERENCE": "00:00:00"
-            },
-            {
-                "AGENT": "Mars134 Demo1",
-                "TIME_ZONE": "America/New_York",
-                "PUBLISHED_FLAG": true,
-                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
-                "FROM_DATE": "Apr 02, 2020",
-                "FROM_TIME": "00:00:00",
-                "TO_DATE": "Apr 02, 2020",
-                "TO_TIME": "23:59:00",
-                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
-                "ACTUAL_ACTIVITY": "Unknown",
-                "IN_ADHERENCE": "23:59:59",
-                "OUT_ADHERENCE": "00:00:00"
-            },
-            {
-                "AGENT": "Mars134 Demo1",
-                "TIME_ZONE": "America/New_York",
-                "PUBLISHED_FLAG": true,
-                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
-                "FROM_DATE": "Apr 01, 2020",
-                "FROM_TIME": "00:00:00",
-                "TO_DATE": "Apr 01, 2020",
-                "TO_TIME": "23:59:00",
-                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
-                "ACTUAL_ACTIVITY": "Unknown",
-                "IN_ADHERENCE": "23:59:59",
-                "OUT_ADHERENCE": "00:00:00"
-            },
-            {
-                "AGENT": "Mars134 Demo1",
-                "TIME_ZONE": "America/New_York",
-                "PUBLISHED_FLAG": true,
-                "SCHEDULING_UNIT_NAME": "perm_mars_demo",
-                "FROM_DATE": "Apr 05, 2020",
-                "FROM_TIME": "00:00:00",
-                "TO_DATE": "Apr 05, 2020",
-                "TO_TIME": "23:59:00",
-                "SCHEDULED_ACTIVITY": "Unpaid Time Off",
-                "ACTUAL_ACTIVITY": "Unknown",
-                "IN_ADHERENCE": "23:59:59",
-                "OUT_ADHERENCE": "00:00:00"
-            }
-        ];
-        let csvData = executor.convertSFRowsToCSV(resdd);
-        logger.info('CSV '+csvData);
 
+        logger.info('8. UPLOAD FILE TO S3');
+        let csvData = executor.convertSFResultToCSV(resultRows);
+        logger.info(csvData);
+        let fileLocation = await executor.saveAdherenceFileToS3(filename, csvData);
 
-        let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
-
-        logger.info('8.GET S3 PRESIGNED URL');
+        logger.info('9.GET S3 PRESIGNED URL');
         let url = executor.getS3SignedURL(fileLocation);
         logger.info("URL:" + url);
         callback(null, {"url": url});

@@ -8,6 +8,8 @@ let LambdaUtils = require('../LambdaUtils.js');
 let mainModule = rewire('../index.js');
 let AWSMock = require('aws-sdk-mock');
 let constantUtils = require("../ConstantUtils");
+let fs = require("fs");
+let readline = require('readline');
 const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
@@ -297,6 +299,12 @@ describe('WFM RTA export report test', function () {
         let fileName = await executor.generateFileName();
         expect(fileName.split("_")[0].length).to.equal(14);
         expect(fileName.split("_")[1]).to.equal("pm.kepler.administrator@wfosaas.com.csv");
+    });
+
+    it("Verify executor method returns csv data when fetched", async () => {
+        let data = JSON.parse(fs.readFileSync('./test/mocks/mockSFResult.json'));
+        let csvData = executor.convertSFResultToCSV(data);
+        expect(csvData.length).closeTo(945,950);
     });
 
 });
