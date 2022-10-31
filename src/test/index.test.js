@@ -11,6 +11,7 @@ let constantUtils = require("../ConstantUtils");
 let fs = require("fs");
 let readline = require('readline');
 let secretsManagerStub = require('../helpers/SecretsManagerHelper');
+let snowflakeHelperStub = require('../helpers/SnowflakeHelper');
 const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
@@ -31,7 +32,9 @@ describe('WFM RTA export report test', function () {
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         process.env.DEBUG = true;
         process.env.WFM_SNOWFLAKE_USER_SECRET = 'dev-wfm-snowflake-user-secret';
-       performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
+        let sfConn = {account: 'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
+        secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
+        performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
             callback(null, data);
@@ -44,16 +47,16 @@ describe('WFM RTA export report test', function () {
         executor = new Executor(mockEvent.body, token);
     });
 
-    afterEach(function(){
-       performGetRequestToCXoneStub.restore();
+    afterEach(function () {
+        performGetRequestToCXoneStub.restore();
         AWSMock.restore();
+        secretAndAccessKeysStub.restore();
     });
 
     it("Report export Done with status = 200", done => {
         let response = mockAPIResponse;
         response.users = [];
-        let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-        secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
+        snowflakeHelperStub = sinon.stub(snowflakeHelperStub,'fetchDataFromSnowflake').returns(fs.readFileSync('./test/mocks/mockSFResult.json'));
         performGetRequestToCXoneStub.resolves(JSON.stringify(response));
         LambdaTester(Handler)
             .event(mockEvent)
@@ -93,18 +96,19 @@ describe('WFM RTA export report test', function () {
         });
     });
 
-    it("Verify executor method has license returns true", async() => {
+    it("Verify executor method has license returns true", async () => {
         performGetRequestToCXoneStub.resolves(JSON.stringify(mockAPIResponse));
         await executor.authenticateRequest();
         let hasLicense = executor.verifyWFMLicense();
         expect(hasLicense).to.equal(true);
     });
 
-    it("Verify executor method returns false when WFM license is not present", async() => {
-        let tenant = { "tenant" : {
-                "licenses" : [ {
-                    "applicationId" : "PLATFORMSERVICES",
-                    "productId" : "EVOLVE",
+    it("Verify executor method returns false when WFM license is not present", async () => {
+        let tenant = {
+            "tenant": {
+                "licenses": [{
+                    "applicationId": "PLATFORMSERVICES",
+                    "productId": "EVOLVE",
                     "featureIds": [141, 62, 111],
                     "settings": {}
                 }]
@@ -191,19 +195,19 @@ describe('WFM RTA export report test', function () {
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when report name is not Adherence", async() => {
+    it("Verify executor method returns false when report name is not Adherence", async () => {
         let invalidEvent = {
-            "reportName" : "ABC",
+            "reportName": "ABC",
             "evolveAuth": {
-                "token" : "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
             }
         };
-        let executorWithInvalidEvent = new Executor(invalidEvent,{});
+        let executorWithInvalidEvent = new Executor(invalidEvent, {});
         let isEventValid = executorWithInvalidEvent.verifyEvent();
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when date range is incorrect", async() => {
+    it("Verify executor method returns false when date range is incorrect", async () => {
         let invalidEvent = {
             "reportName": "adherenceV2",
             "reportDateRange": {
@@ -231,7 +235,7 @@ describe('WFM RTA export report test', function () {
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when query is not present", async() => {
+    it("Verify executor method returns false when query is not present", async () => {
         let invalidEvent = {
             "reportName": "adherenceV2",
             "reportDateRange": {
@@ -309,7 +313,7 @@ describe('WFM RTA export report test', function () {
     it("Verify executor method returns csv data when fetched", async () => {
         let data = JSON.parse(fs.readFileSync('./test/mocks/mockSFResult.json'));
         let csvData = executor.convertSFResultToCSV(data);
-        expect(csvData.length).closeTo(945,950);
+        expect(csvData.length).closeTo(945, 950);
     });
 
     it("Verify executor method returns csv data when no result is returned from snowflake", async () => {
@@ -318,35 +322,35 @@ describe('WFM RTA export report test', function () {
         expect(csvData).toString().endsWith('Out of Adherence');
     });
 
-    it("Verify executor method returns snowflake result", async () => {
-        // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-        // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
-        await executor.getSFUserNameAndPassword();
-        let fetchDataSFObject = {
-            tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
-            schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242ac110003'],
-            userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
-            suStartDate: '2020-04-01',
-            suEndDate: '2020-04-05'
-        };
-        let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
-        expect(JSON.parse(jsonRows).length).to.equal(5);
-    });
-
-    it("Verify executor method returns when snowflake result is not received", async () => {
-        // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-        // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
-        await executor.getSFUserNameAndPassword();
-        let fetchDataSFObject = {
-            tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
-            schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242xa110003'],
-            userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
-            suStartDate: '2020-04-01',
-            suEndDate: '2020-04-05'
-        };
-        let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
-        expect(jsonRows).to.equal('0');
-    });
+    // it("Verify executor method returns snowflake result", async () => {
+    //     // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
+    //     // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
+    //     await executor.getSFUserNameAndPassword();
+    //     let fetchDataSFObject = {
+    //         tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
+    //         schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242ac110003'],
+    //         userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
+    //         suStartDate: '2020-04-01',
+    //         suEndDate: '2020-04-05'
+    //     };
+    //     let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
+    //     expect(JSON.parse(jsonRows).length).to.equal(5);
+    // });
+    //
+    // it("Verify executor method returns when snowflake result is not received", async () => {
+    //     // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
+    //     // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
+    //     await executor.getSFUserNameAndPassword();
+    //     let fetchDataSFObject = {
+    //         tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
+    //         schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242xa110003'],
+    //         userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
+    //         suStartDate: '2020-04-01',
+    //         suEndDate: '2020-04-05'
+    //     };
+    //     let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
+    //     expect(jsonRows).to.equal('0');
+    // });
 });
 
 describe('WFM RTA export report failure test cases', function () {
