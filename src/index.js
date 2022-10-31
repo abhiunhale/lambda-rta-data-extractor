@@ -13,6 +13,7 @@ let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 let constantUtils = require("./ConstantUtils");
 const {queryParams} = require("./resources/queryParams");
+let secretsManager = require('./helpers/SecretsManagerHelper');
 const constants = constantUtils.getConstants;
 
 function Executor(event, token) {
@@ -25,6 +26,7 @@ function Executor(event, token) {
     let s3 = new AWS.S3({
         apiVersion: "2012-10-17"
     });
+    let snowflakeConnectionKeys = {};
 
     self.verifyFeatureToggleIsOn = async function () {
         await LambdaUtils.performGetRequestToCXone(constants.CHECK_FT_STATUS_API + constants.EXPORT_FT, token, host, true, tenant.schemaName).then((response) => {
@@ -161,15 +163,25 @@ function Executor(event, token) {
         let responseRows;
         let sqlText;
         let tenantId = paramObject.tenantId;
-        let schedulingUnitId = paramObject.schedulingUnits.map(d => `'${d}'`).join(',');
-        let userId = paramObject.userIds.map(d => `'${d}'`).join(',');
+        let schedulingUnitId;
+        if(paramObject.schedulingUnits.length >1) {
+            schedulingUnitId = paramObject.schedulingUnits.map(d => `'${d}'`).join(',');
+        }else{
+            schedulingUnitId = '\'' + paramObject.schedulingUnits + '\'';
+        }
+        let userId;
+        if(paramObject.userIds.length >1) {
+            userId = paramObject.userIds.map(d => `'${d}'`).join(',');
+        }else{
+            userId = '\'' + paramObject.userIds + '\'';
+        }
         let suStartDate = paramObject.suStartDate;
         let suEndDate = paramObject.suEndDate;
 
         let connection = snowflake.createConnection({
-            account: "cxone_na1_dev",
-            username: "WFM_DATA_EXTRACT_MS",
-            password: "gICW#U48xm46JJzA",
+            account: snowflakeConnectionKeys.account,
+            username: snowflakeConnectionKeys.username,
+            password: snowflakeConnectionKeys.password,
             application: "WFM-Extract-Service"
         });
 
@@ -194,7 +206,7 @@ function Executor(event, token) {
             queryParams.part5 + suEndDate + queryParams.part6;
 
         await self.checkRecords(connection, sqlText, paramObject).then((response) => {
-            responseRows = JSON.parse(response);
+            responseRows = JSON.stringify(response);
             logger.log("response from execute sql : " + JSON.stringify(response));
         }).catch((error) => {
             logger.log("error in statement execution" + error);
@@ -255,17 +267,30 @@ function Executor(event, token) {
         ];
 
         if (jsonRows === 0) {
-            let response = " ";
+            let response = "";
             fields.forEach(function (field) {
                 response = response + ',' + field.label;
             });
-            return response.substring(2, response.length);
+            return response.substring(1, response.length);
         }
         let json2csvParser = new Parser({fields});
 
         return json2csvParser.parse(jsonRows);
     };
 
+    self.getSFUserNameAndPassword = async () => {
+        try {
+            if (Object.keys(snowflakeConnectionKeys).length === 0) {
+                snowflakeConnectionKeys = await secretsManager.getSecrets(process.env.WFM_SNOWFLAKE_USER_SECRET);
+                logger.debug("access keys: " + JSON.stringify(snowflakeConnectionKeys));
+                logger.info("access keys retrieved successfully " + Object.keys(snowflakeConnectionKeys).length);
+                return true;
+            }
+        } catch (e) {
+            throw new Error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
+        }
+        return false;
+    };
 
 }
 
@@ -326,6 +351,7 @@ exports.handler = async (event, context, callback) => {
         let userIds = await executor.getUsersFromUH();
 
         logger.info('6. FETCH DATA FROM SF.');
+        let isSFDetails = await executor.getSFUserNameAndPassword();
         fetchDataSFObject['tenantId'] = executor.getTenantId();
         fetchDataSFObject['schedulingUnits'] = executor.getSchedulingUnits();
         fetchDataSFObject['userIds'] = userIds;
@@ -337,8 +363,7 @@ exports.handler = async (event, context, callback) => {
         let filename = executor.generateFileName();
 
         logger.info('8. UPLOAD FILE TO S3');
-        let csvData = executor.convertSFResultToCSV(resultRows);
-        logger.info(csvData);
+        let csvData = executor.convertSFResultToCSV(JSON.parse(resultRows));
         let fileLocation = await executor.saveAdherenceFileToS3(filename, csvData);
 
         logger.info('9.GET S3 PRESIGNED URL');
