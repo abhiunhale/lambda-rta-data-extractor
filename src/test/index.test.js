@@ -330,6 +330,7 @@ describe('WFM RTA export report test', function () {
             suEndDate: '2020-04-05'
         };
         let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
+        console.log(jsonRows);
         expect(JSON.parse(jsonRows).length).to.equal(5);
     });
 
@@ -345,6 +346,7 @@ describe('WFM RTA export report test', function () {
             suEndDate: '2020-04-05'
         };
         let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
+        console.log(jsonRows);
         expect(jsonRows).to.equal('0');
     });
 });

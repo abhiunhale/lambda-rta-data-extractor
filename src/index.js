@@ -164,15 +164,15 @@ function Executor(event, token) {
         let sqlText;
         let tenantId = paramObject.tenantId;
         let schedulingUnitId;
-        if(paramObject.schedulingUnits.length >1) {
+        if (paramObject.schedulingUnits.length > 1) {
             schedulingUnitId = paramObject.schedulingUnits.map(d => `'${d}'`).join(',');
-        }else{
+        } else {
             schedulingUnitId = '\'' + paramObject.schedulingUnits + '\'';
         }
         let userId;
-        if(paramObject.userIds.length >1) {
+        if (paramObject.userIds.length > 1) {
             userId = paramObject.userIds.map(d => `'${d}'`).join(',');
-        }else{
+        } else {
             userId = '\'' + paramObject.userIds + '\'';
         }
         let suStartDate = paramObject.suStartDate;
@@ -188,10 +188,9 @@ function Executor(event, token) {
         connection.connect(
             function (err, conn) {
                 if (err) {
-                    console.error('Unable to connect: ' + err.message);
+                    logger.error('Unable to connect: ' + err.message);
                 } else {
-                    console.log('Successfully connected to Snowflake.');
-                    // Optional: store the connection ID.
+                    logger.log('Successfully connected to Snowflake with ID: ' + conn.getId());
                     connection_ID = conn.getId();
                 }
             }
@@ -205,7 +204,7 @@ function Executor(event, token) {
             queryParams.part3 + userId + queryParams.part4 + suStartDate +
             queryParams.part5 + suEndDate + queryParams.part6;
 
-        await self.checkRecords(connection, sqlText, paramObject).then((response) => {
+        await self.executeSFQuery(connection, sqlText, paramObject).then((response) => {
             responseRows = JSON.stringify(response);
             logger.log("response from execute sql : " + JSON.stringify(response));
         }).catch((error) => {
@@ -214,9 +213,9 @@ function Executor(event, token) {
 
         connection.destroy(function (err, conn) {
             if (err) {
-                console.error('Unable to disconnect: ' + err.message);
+                logger.error('Unable to disconnect: ' + err.message);
             } else {
-                console.log('Disconnected connection with id: ' + connection.getId());
+                logger.log('Disconnected connection with id: ' + connection.getId());
             }
         });
 
@@ -224,7 +223,7 @@ function Executor(event, token) {
 
     };
 
-    self.checkRecords = async function (conn, sqlText) {
+    self.executeSFQuery = async function (conn, sqlText) {
         return new Promise((resolve, reject) => {
             try {
                 conn.execute({
@@ -282,14 +281,13 @@ function Executor(event, token) {
         try {
             if (Object.keys(snowflakeConnectionKeys).length === 0) {
                 snowflakeConnectionKeys = await secretsManager.getSecrets(process.env.WFM_SNOWFLAKE_USER_SECRET);
-                logger.debug("access keys: " + JSON.stringify(snowflakeConnectionKeys));
-                logger.info("access keys retrieved successfully " + Object.keys(snowflakeConnectionKeys).length);
-                return true;
+                logger.debug("Connection keys: " + JSON.stringify(snowflakeConnectionKeys));
+                logger.info("Connection keys retrieved successfully " + Object.keys(snowflakeConnectionKeys).length);
             }
         } catch (e) {
+            logger.error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
             throw new Error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
         }
-        return false;
     };
 
 }
@@ -351,7 +349,7 @@ exports.handler = async (event, context, callback) => {
         let userIds = await executor.getUsersFromUH();
 
         logger.info('6. FETCH DATA FROM SF.');
-        let isSFDetails = await executor.getSFUserNameAndPassword();
+        await executor.getSFUserNameAndPassword();
         fetchDataSFObject['tenantId'] = executor.getTenantId();
         fetchDataSFObject['schedulingUnits'] = executor.getSchedulingUnits();
         fetchDataSFObject['userIds'] = userIds;
