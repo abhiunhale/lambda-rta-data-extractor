@@ -28,7 +28,7 @@ describe('WFM RTA export report test', function () {
         process.env.DATALAKE_BUCKET = "sample-dl-bucket";
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         process.env.DEBUG = true;
-    //    performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
+        performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
             callback(null, data);
@@ -42,14 +42,14 @@ describe('WFM RTA export report test', function () {
     });
 
     afterEach(function(){
-  //      performGetRequestToCXoneStub.restore();
+        performGetRequestToCXoneStub.restore();
         AWSMock.restore();
     });
 
     it("Report export Done with status = 200", done => {
         let response = mockAPIResponse;
         response.users = [];
-  //      performGetRequestToCXoneStub.resolves(JSON.stringify(response));
+        performGetRequestToCXoneStub.resolves(JSON.stringify(response));
         LambdaTester(Handler)
             .event(mockEvent)
             .expectResult((result) => {
