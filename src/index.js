@@ -101,12 +101,13 @@ function Executor(event, token) {
     self.getSchedulingUnits = function () {
         let schedulingUnitIds = [];
         let queries = event.query;
-        queries.forEach(function (query) {
+        queries.every(function (query) {
             if (query.filterName === 'schedulingId') {
                 let values = query.values;
                 values.forEach(function (value) {
                     schedulingUnitIds.push(value.key);
                 });
+                return false;
             }
         });
         return schedulingUnitIds;
@@ -270,6 +271,7 @@ exports.handler = async (event, context, callback) => {
         fetchDataSFObject['userIds'] = userIds;
         fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
         fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
+        fetchDataSFObject['tenantSchemaName'] = executor.getTenantSchemaName();
         let resultRows = await snowflakeHelper.fetchDataFromSnowflake(fetchDataSFObject, executor.getConnectionDetails());
 
         logger.info('7. GENERATE NAME FOR CSV FILE');

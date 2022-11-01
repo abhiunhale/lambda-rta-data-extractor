@@ -4,19 +4,19 @@ let commonUtils = require('lambda-common-utils');
 const constantUtils = require("../ConstantUtils");
 const logger = commonUtils.loggerUtils.getLogger;
 const constants = constantUtils.getConstants;
+let tenantId, tenantSchemaName;
 
 async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
-    let connection_ID;
     let responseRows;
     let sqlText;
-    let tenantId = paramObject.tenantId;
+    tenantId = paramObject.tenantId;
     let schedulingUnitId;
+    let userId;
     if (paramObject.schedulingUnits.length > 1) {
         schedulingUnitId = paramObject.schedulingUnits.map(d => `'${d}'`).join(',');
     } else {
         schedulingUnitId = '\'' + paramObject.schedulingUnits + '\'';
     }
-    let userId;
     if (paramObject.userIds.length > 1) {
         userId = paramObject.userIds.map(d => `'${d}'`).join(',');
     } else {
@@ -24,6 +24,7 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
     }
     let suStartDate = paramObject.suStartDate;
     let suEndDate = paramObject.suEndDate;
+    tenantSchemaName = paramObject.tenantSchemaName;
 
     let connection = snowflake.createConnection({
         account: snowflakeConnectionKeys.account,
@@ -49,9 +50,9 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
 
     await executeSFQuery(connection, sqlText, paramObject).then((response) => {
         responseRows = JSON.stringify(response);
-        logger.log("response from execute sql : " + JSON.stringify(response));
+        logger.log("Tenant is: "+tenantSchemaName+", Response from execute sql : " + JSON.stringify(response));
     }).catch((error) => {
-        logger.log("error in statement execution" + error);
+        logger.log("Tenant is: "+tenantSchemaName+", error in statement execution" + error);
     });
 
     connection.destroy(function (err, conn) {
@@ -72,7 +73,7 @@ async function executeSFQuery(conn, sqlText) {
             conn.execute({
                 sqlText: sqlText, complete: function (err, stmt, rows) {
                     if (err) {
-                        logger.info(`${stmt.getSqlText()} : ${err.code}`);
+                        logger.error(`[Tenant is : ${tenantSchemaName}],  ${stmt.getSqlText()} : ${err.code}`);
                         reject(0);
                     } else {
                         if (rows.length > 1) {
@@ -86,6 +87,7 @@ async function executeSFQuery(conn, sqlText) {
             });
         } catch (err) {
             error(err);
+            logger.error('Failed to execute SQL query for Tenant: '+tenantSchemaName+ ' , with error: '+err.message);
         }
     });
 }

@@ -51,6 +51,7 @@ describe('WFM RTA export report test', function () {
         performGetRequestToCXoneStub.restore();
         AWSMock.restore();
         connectionKeysStub.restore();
+        snowflakeHelperStub.restore();
     });
 
     it("Report export Done with status = 200", done => {

@@ -9,7 +9,8 @@ const getSecrets = async (SecretId) => {
     return new Promise((resolve, reject) => {
         secretsManager.getSecretValue({SecretId}, (err, result) => {
             if (err) {
-                reject(err)
+                reject(err);
+                logger.error('Error in fetching secrets :'+err.message);
             } else {
                 resolve(JSON.parse(result.SecretString))
                 logger.debug("Secrets : " + result.SecretString)
