@@ -8,9 +8,14 @@ let LambdaUtils = require('../LambdaUtils.js');
 let mainModule = rewire('../index.js');
 let AWSMock = require('aws-sdk-mock');
 let constantUtils = require("../ConstantUtils");
+let fs = require("fs");
+let readline = require('readline');
+let secretsManagerStub = require('../helpers/SecretsManagerHelper');
+let snowflakeHelperStub = require('../helpers/SnowflakeHelper');
 const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
+let connectionKeysStub;
 let executor;
 let mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
 
@@ -26,6 +31,9 @@ describe('WFM RTA export report test', function () {
         process.env.DATALAKE_BUCKET = "sample-dl-bucket";
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         process.env.DEBUG = true;
+        process.env.WFM_SNOWFLAKE_USER_SECRET = 'dev-wfm-snowflake-user-secret';
+        let sfConn = {account: 'cxone_na1_dev', username: 'sample', password: 'sample'};
+        connectionKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
@@ -39,14 +47,18 @@ describe('WFM RTA export report test', function () {
         executor = new Executor(mockEvent.body, token);
     });
 
-    afterEach(function(){
+    afterEach(function () {
         performGetRequestToCXoneStub.restore();
         AWSMock.restore();
+        connectionKeysStub.restore();
+        snowflakeHelperStub.restore();
     });
 
     it("Report export Done with status = 200", done => {
         let response = mockAPIResponse;
         response.users = [];
+        snowflakeHelperStub = sinon.stub(snowflakeHelperStub, 'fetchDataFromSnowflake')
+            .returns(fs.readFileSync('./test/mocks/mockSFResult.json'));
         performGetRequestToCXoneStub.resolves(JSON.stringify(response));
         LambdaTester(Handler)
             .event(mockEvent)
@@ -86,18 +98,19 @@ describe('WFM RTA export report test', function () {
         });
     });
 
-    it("Verify executor method has license returns true", async() => {
+    it("Verify executor method has license returns true", async () => {
         performGetRequestToCXoneStub.resolves(JSON.stringify(mockAPIResponse));
         await executor.authenticateRequest();
         let hasLicense = executor.verifyWFMLicense();
         expect(hasLicense).to.equal(true);
     });
 
-    it("Verify executor method returns false when WFM license is not present", async() => {
-        let tenant = { "tenant" : {
-                "licenses" : [ {
-                    "applicationId" : "PLATFORMSERVICES",
-                    "productId" : "EVOLVE",
+    it("Verify executor method returns false when WFM license is not present", async () => {
+        let tenant = {
+            "tenant": {
+                "licenses": [{
+                    "applicationId": "PLATFORMSERVICES",
+                    "productId": "EVOLVE",
                     "featureIds": [141, 62, 111],
                     "settings": {}
                 }]
@@ -184,19 +197,19 @@ describe('WFM RTA export report test', function () {
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when report name is not Adherence", async() => {
+    it("Verify executor method returns false when report name is not Adherence", async () => {
         let invalidEvent = {
-            "reportName" : "ABC",
+            "reportName": "ABC",
             "evolveAuth": {
-                "token" : "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
+                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOjExZThjMmQyLTY2OGEtNGFlMC05MzVmLTAyNDJhYzExMDAwMyIsInJvbGUiOnsibGVnYWN5SWQiOiJBZG1pbmlzdHJhdG9yIiwic2Vjb25kYXJ5Um9sZXMiOlt7ImlkIjoiMTFlOTA5MDAtN2NmZS0yMDcwLTkzNzUtMDI0MmFjMTEwMDA1IiwibGFzdFVwZGF0ZVRpbWUiOjE2MTIyMDM0NDEwMDB9XSwiaWQiOiIxMWU4YzJkMi02MzhjLWMyNTAtYjk5NC0wMjQyYWMxMTAwMDIiLCJsYXN0VXBkYXRlVGltZSI6MTY2NTA1MTQ5NDUyN30sImljQWdlbnRJZCI6IjMyNTgxMyIsImlzcyI6Imh0dHBzOlwvXC9hdXRoLnRlc3QubmljZS1pbmNvbnRhY3QuY29tIiwiZ2l2ZW5fbmFtZSI6IkVtaWx5IiwiYXVkIjoiaW5Db250YWN0IEV2b2x2ZUBpbkNvbnRhY3QuY29tIiwiaWNTUElkIjoiMTA0ODIiLCJpY0JVSWQiOjExMjYzMjE1NzgsIm5hbWUiOiJwbS5rZXBsZXIuYWRtaW5pc3RyYXRvckB3Zm9zYWFzLmNvbSIsInRlbmFudElkIjoiMTFlOGMyZDItNWZiZS1jYTYwLTg1MjQtMDI0MmFjMTEwMDA5IiwiZXhwIjoxNjY1MTQzMTQ2LCJpYXQiOjE2NjUxMzk1NDYsImZhbWlseV9uYW1lIjoiU21pdGgiLCJ0ZW5hbnQiOiJwZXJtX3BtX2tlcGxlcl90ZW5hbnQyNDEzNDg0MCIsInZpZXdzIjp7fSwiaWNDbHVzdGVySWQiOiJUTzMyIn0.Z-vcxglWSK83V7w0fxAKSNOjWktdH4FVb1fGPSe6Znrq9UqJR_vwqQwn3T88ceL3EnjhTAxFcAqGOCSv18Jz_l6MZayL7fAck3JcOMfm0zDFY-xC-YSfH8tcBSrrEoFn1EpRti9rzRTH9Hdsa5ogdVV4WS-3l-uCDjI0yqfodRo"
             }
         };
-        let executorWithInvalidEvent = new Executor(invalidEvent,{});
+        let executorWithInvalidEvent = new Executor(invalidEvent, {});
         let isEventValid = executorWithInvalidEvent.verifyEvent();
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when date range is incorrect", async() => {
+    it("Verify executor method returns false when date range is incorrect", async () => {
         let invalidEvent = {
             "reportName": "adherenceV2",
             "reportDateRange": {
@@ -224,7 +237,7 @@ describe('WFM RTA export report test', function () {
         expect(isEventValid).to.equal(false);
     });
 
-    it("Verify executor method returns false when query is not present", async() => {
+    it("Verify executor method returns false when query is not present", async () => {
         let invalidEvent = {
             "reportName": "adherenceV2",
             "reportDateRange": {
@@ -299,6 +312,17 @@ describe('WFM RTA export report test', function () {
         expect(fileName.split("_")[1]).to.equal("pm.kepler.administrator@wfosaas.com.csv");
     });
 
+    it("Verify executor method returns csv data when fetched", async () => {
+        let data = JSON.parse(fs.readFileSync('./test/mocks/mockSFResult.json'));
+        let csvData = executor.convertSFResultToCSV(data);
+        expect(csvData.length).closeTo(945, 950);
+    });
+
+    it("Verify executor method returns csv data when no result is returned from snowflake", async () => {
+        let data = 0;
+        let csvData = executor.convertSFResultToCSV(data);
+        expect(csvData).toString().endsWith('Out of Adherence');
+    });
 });
 
 describe('WFM RTA export report failure test cases', function () {

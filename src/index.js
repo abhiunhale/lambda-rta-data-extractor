@@ -1,6 +1,8 @@
 'use strict';
 
 let AWS = require('aws-sdk');
+let snowflake = require('snowflake-sdk');
+const {Parser} = require('json2csv');
 const getStream = require('get-stream');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +12,9 @@ let LambdaUtils = require('./LambdaUtils.js');
 let commonUtils = require('lambda-common-utils');
 const logger = commonUtils.loggerUtils.getLogger;
 let constantUtils = require("./ConstantUtils");
+const {queryParams} = require("./resources/queryParams");
+let secretsManager = require('./helpers/SecretsManagerHelper');
+let snowflakeHelper = require('./helpers/SnowflakeHelper');
 const constants = constantUtils.getConstants;
 
 function Executor(event, token) {
@@ -22,6 +27,7 @@ function Executor(event, token) {
     let s3 = new AWS.S3({
         apiVersion: "2012-10-17"
     });
+    let snowflakeConnectionKeys = {};
 
     self.verifyFeatureToggleIsOn = async function () {
         await LambdaUtils.performGetRequestToCXone(constants.CHECK_FT_STATUS_API + constants.EXPORT_FT, token, host, true, tenant.schemaName).then((response) => {
@@ -35,11 +41,11 @@ function Executor(event, token) {
     };
 
     self.authenticateRequest = async function () {
-        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, true, self.getTenant()).then((response) => {
+        await LambdaUtils.performGetRequestToCXone(constants.CURRENT_API, token, host, true, self.getTenantSchemaName()).then((response) => {
             tenant = JSON.parse(response).tenant;
             logger.log("Successfully authenticated tenant : " + tenant.schemaName);
         }).catch((error) => {
-            commonUtils.metricsWriter.addTenantMetricWithDimension(tenant, `LMBD-WFM-export-failures-D:reason`, 'getTenant', 1);
+            commonUtils.metricsWriter.addTenantMetricWithDimension(tenant, `LMBD-WFM-export-failures-D:reason`, 'getTenantSchemaName', 1);
             commonUtils.metricsWriter.flushAggregatedMetrics();
             throw new Error(JSON.stringify(error));
         });
@@ -92,6 +98,21 @@ function Executor(event, token) {
         return userIds;
     };
 
+    self.getSchedulingUnits = function () {
+        let schedulingUnitIds = [];
+        let queries = event.query;
+        queries.every(function (query) {
+            if (query.filterName === 'schedulingId') {
+                let values = query.values;
+                values.forEach(function (value) {
+                    schedulingUnitIds.push(value.key);
+                });
+                return false;
+            }
+        });
+        return schedulingUnitIds;
+    };
+
     self.generateFileName = function () {
         //sample file name : 20221007155945_pm.kepler.administrator@wfosaas.com.csv
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -127,13 +148,64 @@ function Executor(event, token) {
         return s3.getSignedUrl('getObject', fileLocation);
     };
 
-    self.getTenant = function () {
+    self.getTenantSchemaName = function () {
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
         let schemaName = decoded_token.tenant;
         if (schemaName === 'wfo_master' && (process.env.AWS_PROFILE === "dev") || process.env.AWS_PROFILE === "test")
             schemaName = "perm_lambda_IT";
         return schemaName;
     };
+
+    self.getTenantId = function () {
+        return tenant.tenantId;
+    };
+
+    self.getConnectionDetails = function () {
+        return snowflakeConnectionKeys;
+    }
+
+    self.convertSFResultToCSV = function (data) {
+        let jsonRows = data;
+        let fields = [
+            {label: 'Agent', value: 'AGENT'},
+            {label: 'Time Zone', value: 'TIME_ZONE'},
+            {label: 'Published Schedule', value: 'PUBLISHED_FLAG'},
+            {label: 'Scheduling Unit', value: 'SCHEDULING_UNIT_NAME'},
+            {label: 'From (Date)', value: 'FROM_DATE'},
+            {label: 'From (Time)', value: 'FROM_TIME'},
+            {label: 'To (Date)', value: 'TO_DATE'},
+            {label: 'To (Time)', value: 'TO_TIME'},
+            {label: 'Scheduled Activity', value: 'SCHEDULED_ACTIVITY'},
+            {label: 'Actual Activity', value: 'ACTUAL_ACTIVITY'},
+            {label: 'In Adherence', value: 'IN_ADHERENCE'},
+            {label: 'Out of Adherence', value: 'OUT_ADHERENCE'}
+        ];
+
+        if (jsonRows === 0) {
+            let response = "";
+            fields.forEach(function (field) {
+                response = response + ',' + field.label;
+            });
+            return response.substring(1, response.length);
+        }
+        let json2csvParser = new Parser({fields});
+
+        return json2csvParser.parse(jsonRows);
+    };
+
+    self.getSFUserNameAndPassword = async () => {
+        try {
+            if (Object.keys(snowflakeConnectionKeys).length === 0) {
+                snowflakeConnectionKeys = await secretsManager.getSecrets(process.env.WFM_SNOWFLAKE_USER_SECRET);
+                logger.debug("Connection keys: " + JSON.stringify(snowflakeConnectionKeys));
+                logger.info("Connection keys retrieved successfully " + Object.keys(snowflakeConnectionKeys).length);
+            }
+        } catch (e) {
+            logger.error(`Not able to get connection keys, Error: ${JSON.stringify(e)}`);
+            throw new Error(JSON.stringify(error));
+        }
+    };
+
 }
 
 exports.Executor = Executor;
@@ -147,7 +219,7 @@ exports.handler = async (event, context, callback) => {
     logger.log("event:" + JSON.stringify(event));
     let hasWFMLicense = false;
     let token = "";
-    let data;
+    let fetchDataSFObject = {};
 
     logger.info('0. BEGIN HANDLER AND VERIFY HOST/TOKEN');
     if (event.headers && event.headers.Authorization && event.headers.Authorization.indexOf("Bearer ") === 0) {
@@ -158,7 +230,7 @@ exports.handler = async (event, context, callback) => {
         callback(constants.BAD_REQUEST);
     }
     let executor = new Executor(event.body, token);
-    commonUtils.loggerUtils.setDebugMode(process.env.DEBUG, executor.getTenant());
+    commonUtils.loggerUtils.setDebugMode(process.env.DEBUG, executor.getTenantSchemaName());
     if (!process.env.SERVICE_URL) {
         logger.error('Fail to validate host from process :' + process.env.SERVICE_URL);
         callback(constants.INTERNAL_ERROR);
@@ -192,17 +264,24 @@ exports.handler = async (event, context, callback) => {
         logger.info('5. GET LIST OF USER IDs');
         let userIds = await executor.getUsersFromUH();
 
-        logger.info('6. GENERATE NAME FOR CSV FILE');
+        logger.info('6. FETCH DATA FROM SF.');
+        await executor.getSFUserNameAndPassword();
+        fetchDataSFObject['tenantId'] = executor.getTenantId();
+        fetchDataSFObject['schedulingUnits'] = executor.getSchedulingUnits();
+        fetchDataSFObject['userIds'] = userIds;
+        fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
+        fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
+        fetchDataSFObject['tenantSchemaName'] = executor.getTenantSchemaName();
+        let resultRows = await snowflakeHelper.fetchDataFromSnowflake(fetchDataSFObject, executor.getConnectionDetails());
+
+        logger.info('7. GENERATE NAME FOR CSV FILE');
         let filename = executor.generateFileName();
 
-        logger.info('7. UPLOAD FILE TO S3');
-        const parseStream = parse({delimiter: ","});
-        data = await getStream.array(fs.createReadStream(path.join(__dirname, "./test/mocks/mockAdherence.csv")).pipe(parseStream));
-        data = data.map(line => line.join(',')).join('\n');
+        logger.info('8. UPLOAD FILE TO S3');
+        let csvData = executor.convertSFResultToCSV(JSON.parse(resultRows));
+        let fileLocation = await executor.saveAdherenceFileToS3(filename, csvData);
 
-        let fileLocation = await executor.saveAdherenceFileToS3(filename, data);
-
-        logger.info('8.GET S3 PRESIGNED URL');
+        logger.info('9.GET S3 PRESIGNED URL');
         let url = executor.getS3SignedURL(fileLocation);
         logger.info("URL:" + url);
         callback(null, {"url": url});

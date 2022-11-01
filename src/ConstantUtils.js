@@ -14,8 +14,10 @@ const exportConstant = {
     CURRENT_API: "/tenants/current?sensitive=true",
     CHECK_FT_STATUS_API: "/config/toggledFeatures/check?featureName=",
     USER_HUB_API: "/user-management/v1/users",
+    SF_APPLICATION: "WFM-Extract-Service",
 
     EXPORT_FT: "release-wfm-RTACsvExportFromSFDL-CXWFM-30711",
-    EXPIRATION_TIME_MILLISECONDS: 1000 * 60
+    EXPIRATION_TIME_MILLISECONDS: 1000 * 60,
+    CONFIG_ERROR: 'Missing region in config'
 };
 exports.getConstants = exportConstant;
