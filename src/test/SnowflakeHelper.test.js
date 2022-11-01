@@ -25,7 +25,7 @@ describe('check performGetRequestToCXone', function () {
         suEndDate: '2020-04-05'
     };
 
-    let sfConn = {account: 'cxone_na1', username: 'WFM_DATA_EXTRACT_MS', password: 'gICWxm46JJzA'};
+    let sfConn = {account: 'cxone_na1', username: 'sample', password: 'sample'};
 
     it("Verify snowflake helper validations", async () => {
         let errorMsg = {err: constants.INVALID_TOKEN};

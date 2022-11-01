@@ -7,5 +7,4 @@ queryParams['part4'] = ") and SU_START_DATE_ID >= '";
 queryParams['part5'] = "' and SU_END_DATE_ID <= '";
 queryParams['part6'] = "' ) as adherence_fact inner join DATAHUB.USERHUB_REFINED.USER_SCD_DIM userDim on userDim.USER_ID = adherence_fact.USER_ID and userDim._tenant_id = adherence_fact._tenant_id and userDim.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.SCHEDULING_UNIT_SCD_DIM SUSCD on SUSCD.SCHEDULING_UNIT_ID = adherence_fact.SCHEDULING_UNIT_ID and suscd._tenant_id = adherence_fact._tenant_id and suscd.CURRENT_FLAG = true inner join DATAHUB.WFM_REFINED.ACTIVITY_DIM activityDim on activityDim.ACTIVITY_ID = adherence_fact.SCHEDULED_ACTIVITY_ID and activityDim._tenant_id = adherence_fact._tenant_id inner join DATAHUB.WFM_REFINED.WFM_AGENT_STATE_SCD_DIM agentActivity on agentActivity.WFM_AGENT_STATE_ID = adherence_fact.ACTUAL_WFM_AGENT_STATE_ID and agentActivity._tenant_id = adherence_fact._tenant_id and agentActivity.CURRENT_FLAG = true;";
 
-
-module.exports =  { queryParams : queryParams };
+module.exports = {queryParams: queryParams};

@@ -159,7 +159,7 @@ function Executor(event, token) {
         return tenant.tenantId;
     };
 
-    self.getConnectionDetails = function (){
+    self.getConnectionDetails = function () {
         return snowflakeConnectionKeys;
     }
 
@@ -201,7 +201,7 @@ function Executor(event, token) {
             }
         } catch (e) {
             logger.error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
-            throw new Error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
+            throw new Error(JSON.stringify(error));
         }
     };
 
@@ -270,7 +270,7 @@ exports.handler = async (event, context, callback) => {
         fetchDataSFObject['userIds'] = userIds;
         fetchDataSFObject['suStartDate'] = event.body.reportDateRange.from;
         fetchDataSFObject['suEndDate'] = event.body.reportDateRange.to;
-        let resultRows = await snowflakeHelper.fetchDataFromSnowflake(fetchDataSFObject,executor.getConnectionDetails());
+        let resultRows = await snowflakeHelper.fetchDataFromSnowflake(fetchDataSFObject, executor.getConnectionDetails());
 
         logger.info('7. GENERATE NAME FOR CSV FILE');
         let filename = executor.generateFileName();

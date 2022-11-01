@@ -8,7 +8,6 @@ const rp = require("request-promise");
 const constantUtils = require("../ConstantUtils");
 const constants = constantUtils.getConstants;
 
-
 describe('check performGetRequestToCXone', function () {
 
     this.timeout(15000);

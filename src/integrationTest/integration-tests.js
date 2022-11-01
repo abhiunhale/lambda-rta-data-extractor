@@ -11,8 +11,12 @@ var expect = require('chai').expect;
 var assert = require('assert');
 var AWS = require('aws-sdk');
 if (!process.env.AWS_REGION) {
-    process.env.AWS_REGION = 'us-west-2';
-    AWS.config.update({region: 'us-west-2'});
+    try {
+        process.env.AWS_REGION = 'us-west-2';
+        AWS.config.update({region: 'us-west-2'});
+    } catch (ex) {
+        assert.fail("Error at setting a AWS region.");
+    }
 }
 var mainModule = require('../index.js');
 var LambdaTester = require('lambda-tester');

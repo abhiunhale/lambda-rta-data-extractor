@@ -32,7 +32,7 @@ describe('WFM RTA export report test', function () {
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         process.env.DEBUG = true;
         process.env.WFM_SNOWFLAKE_USER_SECRET = 'dev-wfm-snowflake-user-secret';
-        let sfConn = {account: 'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
+        let sfConn = {account: 'cxone_na1_dev', username: 'sample', password: 'sample'};
         connectionKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {

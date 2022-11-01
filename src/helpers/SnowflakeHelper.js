@@ -1,8 +1,9 @@
 const snowflake = require("snowflake-sdk");
 const {queryParams} = require("../resources/queryParams");
 let commonUtils = require('lambda-common-utils');
+const constantUtils = require("../ConstantUtils");
 const logger = commonUtils.loggerUtils.getLogger;
-
+const constants = constantUtils.getConstants;
 
 async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
     let connection_ID;
@@ -28,7 +29,7 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
         account: snowflakeConnectionKeys.account,
         username: snowflakeConnectionKeys.username,
         password: snowflakeConnectionKeys.password,
-        application: "WFM-Extract-Service"
+        application: constants.SF_APPLICATION
     });
 
     connection.connect(function (err, conn) {
@@ -36,7 +37,6 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
             logger.error('Unable to connect: ' + err.message);
         } else {
             logger.log('Successfully connected to Snowflake with ID: ' + conn.getId());
-            connection_ID = conn.getId();
         }
     });
 
