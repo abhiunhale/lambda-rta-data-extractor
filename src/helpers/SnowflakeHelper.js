@@ -1,5 +1,7 @@
 const snowflake = require("snowflake-sdk");
 const {queryParams} = require("../resources/queryParams");
+let commonUtils = require('lambda-common-utils');
+const logger = commonUtils.loggerUtils.getLogger;
 
 
 async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
@@ -29,24 +31,21 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
         application: "WFM-Extract-Service"
     });
 
-    connection.connect(
-        function (err, conn) {
-            if (err) {
-                logger.error('Unable to connect: ' + err.message);
-            } else {
-                logger.log('Successfully connected to Snowflake with ID: ' + conn.getId());
-                connection_ID = conn.getId();
-            }
+    connection.connect(function (err, conn) {
+        if (err) {
+            logger.error('Unable to connect: ' + err.message);
+        } else {
+            logger.log('Successfully connected to Snowflake with ID: ' + conn.getId());
+            connection_ID = conn.getId();
         }
-    );
+    });
 
     connection.execute({
         sqlText: 'USE WAREHOUSE REPORTS_WH;'
     });
 
-    sqlText = queryParams.part1 + tenantId + queryParams.part2 + schedulingUnitId +
-        queryParams.part3 + userId + queryParams.part4 + suStartDate +
-        queryParams.part5 + suEndDate + queryParams.part6;
+    sqlText = queryParams.part1 + tenantId + queryParams.part2 + schedulingUnitId + queryParams.part3 +
+        userId + queryParams.part4 + suStartDate + queryParams.part5 + suEndDate + queryParams.part6;
 
     await executeSFQuery(connection, sqlText, paramObject).then((response) => {
         responseRows = JSON.stringify(response);
@@ -71,8 +70,7 @@ async function executeSFQuery(conn, sqlText) {
     return new Promise((resolve, reject) => {
         try {
             conn.execute({
-                sqlText: sqlText,
-                complete: function (err, stmt, rows) {
+                sqlText: sqlText, complete: function (err, stmt, rows) {
                     if (err) {
                         logger.info(`${stmt.getSqlText()} : ${err.code}`);
                         reject(0);

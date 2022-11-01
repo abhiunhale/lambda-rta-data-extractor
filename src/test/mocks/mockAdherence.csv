@@ -1,6 +1,0 @@
-Agent,Time Zone,Published Schedule,Scheduling Unit,From (Date),From (Time),To (Date),To (Time),Scheduled Activity,Actual Activity,In Adherence,Out of Adherence
-ABC,America/Los_Angeles,TRUE,APAC,"Aug 29,2022",7:00:00,"Aug 29,2022",10:01:00,Open (Default),Unknown,0:00:00,3:01:00
-ABC,America/Los_Angeles,TRUE,APAC,"Aug 29,2022",10:01:00,"Aug 29,2022",10:31:00,Break,Unknown,0:30:00,0:00:00
-ABC,America/Los_Angeles,TRUE,APAC,"Aug 29,2022",10:31:00,"Aug 29,2022",13:00:00,Open (Default),Unknown,0:00:00,2:29:00
-ABC,America/Los_Angeles,TRUE,APAC,"Aug 29,2022",13:00:00,"Aug 29,2022",13:30:00,Break,Unknown,0:30:00,0:00:00
-ABC,America/Los_Angeles,TRUE,APAC,"Aug 29,2022",13:30:00,"Aug 29,2022",16:00:00,Open (Default),Unknown,0:00:00,2:30:00

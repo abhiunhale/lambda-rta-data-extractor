@@ -15,7 +15,7 @@ let snowflakeHelperStub = require('../helpers/SnowflakeHelper');
 const constants = constantUtils.getConstants;
 let Handler = mainModule.handler;
 let Executor = mainModule.Executor;
-let secretAndAccessKeysStub;
+let connectionKeysStub;
 let executor;
 let mockEvent, performGetRequestToCXoneStub, mockAPIResponse;
 
@@ -28,12 +28,12 @@ describe('WFM RTA export report test', function () {
     beforeEach(function () {
         mockEvent = getMockEvent(JSON.stringify(require('./mocks/mockEvent.json')));
         mockAPIResponse = getMockEvent(JSON.stringify(require('./mocks/mockAPIResult.json')));
-        process.env.DATALAKE_BUCKET = "rta-export-disha";
+        process.env.DATALAKE_BUCKET = "sample-dl-bucket";
         process.env.SERVICE_URL = "https://na1.dev.nice-incontact.com";
         process.env.DEBUG = true;
         process.env.WFM_SNOWFLAKE_USER_SECRET = 'dev-wfm-snowflake-user-secret';
         let sfConn = {account: 'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-        secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
+        connectionKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
         performGetRequestToCXoneStub = sinon.stub(LambdaUtils, 'performGetRequestToCXone');
         AWSMock.mock('S3', 'upload', (params, callback) => {
             let data = {"Location": "ABC"};
@@ -50,13 +50,14 @@ describe('WFM RTA export report test', function () {
     afterEach(function () {
         performGetRequestToCXoneStub.restore();
         AWSMock.restore();
-        secretAndAccessKeysStub.restore();
+        connectionKeysStub.restore();
     });
 
     it("Report export Done with status = 200", done => {
         let response = mockAPIResponse;
         response.users = [];
-        snowflakeHelperStub = sinon.stub(snowflakeHelperStub,'fetchDataFromSnowflake').returns(fs.readFileSync('./test/mocks/mockSFResult.json'));
+        snowflakeHelperStub = sinon.stub(snowflakeHelperStub, 'fetchDataFromSnowflake')
+            .returns(fs.readFileSync('./test/mocks/mockSFResult.json'));
         performGetRequestToCXoneStub.resolves(JSON.stringify(response));
         LambdaTester(Handler)
             .event(mockEvent)
@@ -321,36 +322,6 @@ describe('WFM RTA export report test', function () {
         let csvData = executor.convertSFResultToCSV(data);
         expect(csvData).toString().endsWith('Out of Adherence');
     });
-
-    // it("Verify executor method returns snowflake result", async () => {
-    //     // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-    //     // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
-    //     await executor.getSFUserNameAndPassword();
-    //     let fetchDataSFObject = {
-    //         tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
-    //         schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242ac110003'],
-    //         userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
-    //         suStartDate: '2020-04-01',
-    //         suEndDate: '2020-04-05'
-    //     };
-    //     let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
-    //     expect(JSON.parse(jsonRows).length).to.equal(5);
-    // });
-    //
-    // it("Verify executor method returns when snowflake result is not received", async () => {
-    //     // let sfConn = { account:'cxone_na1_dev', username: 'WFM_DATA_EXTRACT_MS', password: 'gICW#U48xm46JJzA'};
-    //     // secretAndAccessKeysStub = sinon.stub(secretsManagerStub, 'getSecrets').returns(sfConn);
-    //     await executor.getSFUserNameAndPassword();
-    //     let fetchDataSFObject = {
-    //         tenantId: '11e72a4d-c24c-f040-aac3-0242ac110003',
-    //         schedulingUnits: ['11e72a4d-c47b-41f0-aac3-0242xa110003'],
-    //         userIds: ['11e72a4d-c481-3560-aac3-0242ac110003'],
-    //         suStartDate: '2020-04-01',
-    //         suEndDate: '2020-04-05'
-    //     };
-    //     let jsonRows = await executor.fetchDataFromSnowflake(fetchDataSFObject);
-    //     expect(jsonRows).to.equal('0');
-    // });
 });
 
 describe('WFM RTA export report failure test cases', function () {
