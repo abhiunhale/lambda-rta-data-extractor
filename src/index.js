@@ -200,7 +200,7 @@ function Executor(event, token) {
                 logger.info("Connection keys retrieved successfully " + Object.keys(snowflakeConnectionKeys).length);
             }
         } catch (e) {
-            logger.error(`Not able to get secret keys for T0, Error: ${JSON.stringify(e)}`);
+            logger.error(`Not able to get connection keys, Error: ${JSON.stringify(e)}`);
             throw new Error(JSON.stringify(error));
         }
     };
