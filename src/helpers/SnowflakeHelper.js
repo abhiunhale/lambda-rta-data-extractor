@@ -50,9 +50,9 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
 
     await executeSFQuery(connection, sqlText, paramObject).then((response) => {
         responseRows = JSON.stringify(response);
-        logger.log("Tenant is: "+tenantSchemaName+", Response from execute sql : " + JSON.stringify(response));
+        logger.log("Tenant is: " + tenantSchemaName + ", Response from execute sql : " + JSON.stringify(response));
     }).catch((error) => {
-        logger.log("Tenant is: "+tenantSchemaName+", error in statement execution" + error);
+        logger.log("Tenant is: " + tenantSchemaName + ", error in statement execution" + error);
     });
 
     connection.destroy(function (err, conn) {
@@ -87,7 +87,7 @@ async function executeSFQuery(conn, sqlText) {
             });
         } catch (err) {
             error(err);
-            logger.error('Failed to execute SQL query for Tenant: '+tenantSchemaName+ ' , with error: '+err.message);
+            logger.error('Failed to execute SQL query for Tenant: ' + tenantSchemaName + ' , with error: ' + err.message);
         }
     });
 }
