@@ -151,7 +151,7 @@ function Executor(event, token) {
     self.getTenantSchemaName = function () {
         let decoded_token = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
         let schemaName = decoded_token.tenant;
-        if (schemaName === 'wfo_master' && (process.env.AWS_PROFILE === "dev") || process.env.AWS_PROFILE === "test")
+        if (schemaName === 'wfo_master' && (process.env.AWS_PROFILE === "dev" || process.env.AWS_PROFILE === "test"))
             schemaName = "perm_lambda_IT";
         return schemaName;
     };
