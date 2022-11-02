@@ -240,6 +240,22 @@ Resources:
                  Key: InfrastructureOwner
                  Value: !Ref DevopsContactInformationSSM
 
+  WFMExportGatewayDNSRecord:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      HostedZoneId: !ImportValue
+        'Fn::Sub': 'dev-WfosaasInternalPrivateHostedZoneId'
+      Comment: DNS record WFM snowflake data export
+      Name: !Join
+        - .
+        - - wfm-export-gateway
+          - dev
+          - wfosaas.internal.com
+      Type: CNAME
+      TTL: '300'
+      ResourceRecords:
+        - !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com
+
 Outputs:
   apiGatewayInvokeURL:
     Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm/export
