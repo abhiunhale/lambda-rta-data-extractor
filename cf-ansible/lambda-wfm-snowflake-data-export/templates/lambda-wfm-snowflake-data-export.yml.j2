@@ -125,7 +125,7 @@ Resources:
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
-  apiGatewayDeployment01NOV22:
+  apiGatewayDeployment03NOV22:
       Type: AWS::ApiGateway::Deployment
       DependsOn:
         - apiGatewayRootMethod
@@ -239,6 +239,22 @@ Resources:
              -
                  Key: InfrastructureOwner
                  Value: !Ref DevopsContactInformationSSM
+
+  WFMExportGatewayDNSRecord:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      HostedZoneId: !ImportValue
+        'Fn::Sub': '{{stack_prefix}}-WfosaasInternalPrivateHostedZoneId'
+      Comment: DNS record WFM snowflake data export
+      Name: !Join
+        - .
+        - - wfm-export-gateway
+          - {{stack_prefix}}
+          - wfosaas.internal.com
+      Type: CNAME
+      TTL: '300'
+      ResourceRecords:
+        - !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com
 
 Outputs:
   apiGatewayInvokeURL:
