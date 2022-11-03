@@ -244,12 +244,12 @@ Resources:
     Type: 'AWS::Route53::RecordSet'
     Properties:
       HostedZoneId: !ImportValue
-        'Fn::Sub': 'dev-WfosaasInternalPrivateHostedZoneId'
+        'Fn::Sub': '{{stack_prefix}}-WfosaasInternalPrivateHostedZoneId'
       Comment: DNS record WFM snowflake data export
       Name: !Join
         - .
         - - wfm-export-gateway
-          - dev
+          - {{stack_prefix}}
           - wfosaas.internal.com
       Type: CNAME
       TTL: '300'
