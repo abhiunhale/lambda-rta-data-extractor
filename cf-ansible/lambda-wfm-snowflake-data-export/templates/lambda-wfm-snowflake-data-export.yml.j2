@@ -35,7 +35,7 @@ Parameters:
   WFMExportSFDataGatewayStageName:
         Description: 'WFM Snowflake data export gateway stage'
         Type: String
-        Default: 'wfm'
+        Default: 'wfm-reports'
 
   WFMExportSFDataGatewayHTTPMethod:
     Type: String
@@ -125,7 +125,7 @@ Resources:
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
-  apiGatewayDeployment03NOV22:
+  apiGatewayDeployment11NOV22:
       Type: AWS::ApiGateway::Deployment
       DependsOn:
         - apiGatewayRootMethod
