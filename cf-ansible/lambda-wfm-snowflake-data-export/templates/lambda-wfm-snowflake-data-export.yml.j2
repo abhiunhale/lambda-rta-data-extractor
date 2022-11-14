@@ -81,8 +81,20 @@ Resources:
       Description: WFM SF data export gateway
       EndpointConfiguration:
         Types:
-          - REGIONAL
+          - PRIVATE
       Name: !Ref WFMExportSFDataGatewayName
+      Policies:
+        -
+          PolicyName: wfmApiGatewayPolicy
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                -
+                    Effect: Allow
+                    Action:
+                        - execute-api:Invoke
+                    Resource:
+                        - "*"
 
   apiGatewayResource:
     Type: AWS::ApiGateway::Resource
@@ -125,7 +137,7 @@ Resources:
         ResourceId: !Ref apiGatewayResource
         RestApiId: !Ref apiGateway
 
-  apiGatewayDeployment11NOV22:
+  apiGatewayDeployment14NOV22:
       Type: AWS::ApiGateway::Deployment
       DependsOn:
         - apiGatewayRootMethod
@@ -258,6 +270,6 @@ Resources:
 
 Outputs:
   apiGatewayInvokeURL:
-    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm/export
+    Value: !Sub http://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm/export
   lambdaArn:
     Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
