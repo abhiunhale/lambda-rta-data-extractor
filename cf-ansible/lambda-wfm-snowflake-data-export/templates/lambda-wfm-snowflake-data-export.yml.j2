@@ -88,6 +88,8 @@ Resources:
         Statement:
             -
                 Effect: Allow
+                Principal:
+                    -"*"
                 Action:
                     - execute-api:Invoke
                 Resource:
