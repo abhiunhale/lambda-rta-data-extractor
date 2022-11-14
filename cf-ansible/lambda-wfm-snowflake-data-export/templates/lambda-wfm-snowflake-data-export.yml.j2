@@ -81,19 +81,8 @@ Resources:
       Description: WFM SF data export gateway
       EndpointConfiguration:
         Types:
-          - PRIVATE
+          - REGIONAL
       Name: !Ref WFMExportSFDataGatewayName
-      Policy:
-        Version: "2012-10-17"
-        Statement:
-            -
-                Effect: Allow
-                Principal:
-                    -"*"
-                Action:
-                    - execute-api:Invoke
-                Resource:
-                    - "*"
 
   apiGatewayResource:
     Type: AWS::ApiGateway::Resource
