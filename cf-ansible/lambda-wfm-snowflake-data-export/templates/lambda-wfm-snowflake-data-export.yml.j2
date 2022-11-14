@@ -85,16 +85,16 @@ Resources:
       Name: !Ref WFMExportSFDataGatewayName
       Policies:
         -
-          PolicyName: wfmApiGatewayPolicy
-          PolicyDocument:
-                Version: "2012-10-17"
-                Statement:
-                    -
-                        Effect: Allow
-                        Action:
-                            - execute-api:Invoke
-                        Resource:
-                            - "*"
+            PolicyName: wfmApiGatewayPolicy
+            PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                        -
+                            Effect: Allow
+                            Action:
+                                - execute-api:Invoke
+                            Resource:
+                                - "*"
 
   apiGatewayResource:
     Type: AWS::ApiGateway::Resource
