@@ -243,7 +243,7 @@ Resources:
   WFMExportParameterStore:
       Type: 'AWS::SSM::Parameter'
       Properties:
-        Name: !Sub '/${EnvironmentName}/aws/api-gateway/wfm-reports'
+        Name: !Sub '/${stack_prefix}/aws/api-gateway/wfm-reports'
         Type: 'String'
         Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm-reports
         Description: !Sub 'WFM Data export - API domain (without hostname) for the ${EnvironmentName} environment.'
