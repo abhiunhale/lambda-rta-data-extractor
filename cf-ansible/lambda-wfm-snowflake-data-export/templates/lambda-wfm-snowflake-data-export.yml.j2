@@ -84,11 +84,18 @@ Resources:
           - REGIONAL
       Name: !Ref WFMExportSFDataGatewayName
 
-  apiGatewayResource:
+  apiGatewayResourceWFM:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref apiExportGateway
       ParentId: !GetAtt apiExportGateway.RootResourceId
+      PathPart: wfm-reports
+
+  apiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiExportGateway
+      ParentId: !Ref apiGatewayResourceWFM
       PathPart: export
 
   apiGatewayRootMethod:
@@ -139,7 +146,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/export
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/wfm-reports/export
 
   WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
