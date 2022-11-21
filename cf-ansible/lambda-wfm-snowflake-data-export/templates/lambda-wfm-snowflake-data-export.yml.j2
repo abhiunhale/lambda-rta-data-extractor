@@ -75,7 +75,7 @@ Parameters:
 
 
 Resources:
-  apiGateway:
+  apiExportGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Description: WFM SF data export gateway
@@ -87,8 +87,8 @@ Resources:
   apiGatewayResource:
     Type: AWS::ApiGateway::Resource
     Properties:
-      RestApiId: !Ref apiGateway
-      ParentId: !GetAtt apiGateway.RootResourceId
+      RestApiId: !Ref apiExportGateway
+      ParentId: !GetAtt apiExportGateway.RootResourceId
       PathPart: export
 
   apiGatewayRootMethod:
@@ -123,14 +123,14 @@ Resources:
           - StatusCode: 400
           - StatusCode: 500
         ResourceId: !Ref apiGatewayResource
-        RestApiId: !Ref apiGateway
+        RestApiId: !Ref apiExportGateway
 
-  apiGatewayDeployment11NOV22:
+  apiGatewayDeployment14NOV22:
       Type: AWS::ApiGateway::Deployment
       DependsOn:
         - apiGatewayRootMethod
       Properties:
-        RestApiId: !Ref apiGateway
+        RestApiId: !Ref apiExportGateway
         StageName: !Ref WFMExportSFDataGatewayStageName
 
   lambdaApiGatewayInvoke:
@@ -139,7 +139,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/export
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/export
 
   WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
@@ -240,24 +240,16 @@ Resources:
                  Key: InfrastructureOwner
                  Value: !Ref DevopsContactInformationSSM
 
-  WFMExportGatewayDNSRecord:
-    Type: 'AWS::Route53::RecordSet'
-    Properties:
-      HostedZoneId: !ImportValue
-        'Fn::Sub': '{{stack_prefix}}-WfosaasInternalPrivateHostedZoneId'
-      Comment: DNS record WFM snowflake data export
-      Name: !Join
-        - .
-        - - wfm-export-gateway
-          - {{stack_prefix}}
-          - wfosaas.internal.com
-      Type: CNAME
-      TTL: '300'
-      ResourceRecords:
-        - !Sub ${apiGateway}.execute-api.${AWS::Region}.amazonaws.com
+  WFMExportParameterStore:
+      Type: 'AWS::SSM::Parameter'
+      Properties:
+        Name: !Sub '/{{stack_prefix}}/aws/api-gateway/wfm-reports'
+        Type: 'String'
+        Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm-reports/export
+        Description: !Sub 'WFM Data export - API domain (without hostname)'
 
 Outputs:
   apiGatewayInvokeURL:
-    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm/export
+    Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm-reports/export
   lambdaArn:
     Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
