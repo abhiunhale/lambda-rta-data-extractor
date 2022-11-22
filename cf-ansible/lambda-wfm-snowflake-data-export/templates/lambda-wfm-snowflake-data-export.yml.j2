@@ -84,6 +84,7 @@ Resources:
     Properties:
       RestApiId: !Ref apiExportGateway
       ParentId: !GetAtt apiExportGateway.RootResourceId
+      PathPart: export
 
   apiGatewayRootMethod:
       Type: AWS::ApiGateway::Method
