@@ -84,11 +84,18 @@ Resources:
           - REGIONAL
       Name: !Ref WFMExportSFDataGatewayName
 
-  apiGatewayResource:
+  apiGatewayResourceWFM:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref apiExportGateway
       ParentId: !GetAtt apiExportGateway.RootResourceId
+      PathPart: wfm-reports
+
+  apiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiExportGateway
+      ParentId: !Ref apiGatewayResourceWFM
       PathPart: export
 
   apiGatewayRootMethod:
