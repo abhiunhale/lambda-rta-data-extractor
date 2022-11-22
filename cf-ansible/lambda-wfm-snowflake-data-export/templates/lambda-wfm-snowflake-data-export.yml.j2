@@ -79,19 +79,11 @@ Resources:
           - REGIONAL
       Name: !Ref WFMExportSFDataGatewayName
 
-  apiGatewayResourceWFM:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref apiExportGateway
-      ParentId: !GetAtt apiExportGateway.RootResourceId
-      PathPart: wfm-reports
-
   apiGatewayResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref apiExportGateway
-      ParentId: !Ref apiGatewayResourceWFM
-      PathPart: export
+      ParentId: !GetAtt apiExportGateway.RootResourceId
 
   apiGatewayRootMethod:
       Type: AWS::ApiGateway::Method
@@ -134,6 +126,7 @@ Resources:
       Properties:
         RestApiId: !Ref apiExportGateway
         StageName: LATEST
+        DataTraceEnabled: true
 
   lambdaApiGatewayInvoke:
     Type: AWS::Lambda::Permission
