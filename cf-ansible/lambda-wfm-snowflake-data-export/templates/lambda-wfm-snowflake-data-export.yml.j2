@@ -32,11 +32,6 @@ Parameters:
         Type: String
         Default: {{stack_prefix}}-WFM-SFDataExport
 
-  WFMExportSFDataGatewayStageName:
-        Description: 'WFM Snowflake data export gateway stage'
-        Type: String
-        Default: 'wfm-reports'
-
   WFMExportSFDataGatewayHTTPMethod:
     Type: String
     Default: POST
@@ -131,7 +126,7 @@ Resources:
         - apiGatewayRootMethod
       Properties:
         RestApiId: !Ref apiExportGateway
-        StageName: !Ref WFMExportSFDataGatewayStageName
+        StageName: LATEST
 
   lambdaApiGatewayInvoke:
     Type: AWS::Lambda::Permission
@@ -139,7 +134,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/export
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/${WFMExportSFDataGatewayHTTPMethod}
 
   WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
@@ -250,6 +245,6 @@ Resources:
 
 Outputs:
   apiGatewayInvokeURL:
-    Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/wfm-reports/export
+    Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/LATEST
   lambdaArn:
     Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
