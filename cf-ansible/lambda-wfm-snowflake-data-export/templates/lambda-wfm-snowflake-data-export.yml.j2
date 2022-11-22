@@ -242,8 +242,3 @@ Resources:
         Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/LATEST
         Description: !Sub 'WFM Data export - API domain (without hostname)'
 
-Outputs:
-  apiGatewayInvokeURL:
-    Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/LATEST
-  lambdaArn:
-    Value: !GetAtt WFMSnowflakeExportDataFunction.Arn
