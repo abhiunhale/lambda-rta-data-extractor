@@ -195,6 +195,20 @@ Resources:
          ManagedPolicyArns:
            - >-
              arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+         Policies:
+             -
+                 PolicyName: WFMSnowflakeDataExportPolicyLambdaGatewayS3Access
+                 PolicyDocument:
+                     Version: "2012-10-17"
+                     Statement:
+                         -
+                             Effect: Allow
+                             Action:
+                                 - lambda:*
+                                 - cloudwatch:*
+                                 - apigateway:*
+                             Resource:
+                                 - "*"
 
   WFMSnowflakeExportDataFunction:
      Type: AWS::Lambda::Function
