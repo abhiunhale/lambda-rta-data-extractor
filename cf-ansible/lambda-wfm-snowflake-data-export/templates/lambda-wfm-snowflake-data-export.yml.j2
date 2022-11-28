@@ -151,8 +151,6 @@ Resources:
                              - s3.amazonaws.com
                      Action:
                          - sts:AssumeRole
-                     Resource:
-                         - "*"
          ManagedPolicyArns:
              - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
              - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
@@ -193,6 +191,10 @@ Resources:
                              - events.amazonaws.com
                      Action:
                          - sts:AssumeRole
+         Path: /
+         ManagedPolicyArns:
+           - >-
+             arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
 
   WFMSnowflakeExportDataFunction:
      Type: AWS::Lambda::Function
