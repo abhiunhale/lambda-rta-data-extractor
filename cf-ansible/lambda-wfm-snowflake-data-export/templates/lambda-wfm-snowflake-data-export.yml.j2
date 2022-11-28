@@ -134,6 +134,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/LATEST
 
   WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
@@ -174,6 +175,14 @@ Resources:
                                 - secretsmanager:GetSecretValue
                             Resource:
                                 - "*"
+
+  lambdaApiGatewayInvoke:
+    Type: AWS::ApiGateway::Permission
+    Properties:
+      Action: execute-api:Invoke
+      FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
+      Principal: apigateway.amazonaws.com
+      Resource: "*"
 
   WFMSnowflakeDataExportAPIGatewayRole:
      Type: AWS::IAM::Role
