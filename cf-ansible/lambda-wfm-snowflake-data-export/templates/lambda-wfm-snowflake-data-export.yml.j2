@@ -134,7 +134,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/LATEST
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiExportGateway}/*/${WFMExportSFDataGatewayHTTPMethod}/LATEST
 
   WFMSnowflakeDataExportLambdaRole:
      Type: AWS::IAM::Role
@@ -192,7 +192,6 @@ Resources:
                              - events.amazonaws.com
                      Action:
                          - sts:AssumeRole
-                         - execute-api:Invoke
 
   WFMSnowflakeExportDataFunction:
      Type: AWS::Lambda::Function
