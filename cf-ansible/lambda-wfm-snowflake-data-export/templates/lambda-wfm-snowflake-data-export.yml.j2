@@ -151,6 +151,8 @@ Resources:
                              - s3.amazonaws.com
                      Action:
                          - sts:AssumeRole
+                     Resource:
+                         - "*"
          ManagedPolicyArns:
              - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
              - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
@@ -187,6 +189,7 @@ Resources:
                      Principal:
                          Service:
                              - apigateway.amazonaws.com
+                             - lambda.amazonaws.com
                              - events.amazonaws.com
                      Action:
                          - sts:AssumeRole
