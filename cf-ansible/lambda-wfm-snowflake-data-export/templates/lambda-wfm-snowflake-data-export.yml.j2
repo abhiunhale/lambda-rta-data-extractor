@@ -176,14 +176,6 @@ Resources:
                             Resource:
                                 - "*"
 
-  lambdaApiGatewayInvoke:
-    Type: AWS::ApiGateway::Permission
-    Properties:
-      Action: execute-api:Invoke
-      FunctionName: !GetAtt WFMSnowflakeExportDataFunction.Arn
-      Principal: apigateway.amazonaws.com
-      Resource: "*"
-
   WFMSnowflakeDataExportAPIGatewayRole:
      Type: AWS::IAM::Role
      Properties:
@@ -200,6 +192,9 @@ Resources:
                              - events.amazonaws.com
                      Action:
                          - sts:AssumeRole
+                         - execute-api:Invoke
+                     Resource:
+                         - "*"
          Path: /
          ManagedPolicyArns:
            - >-
