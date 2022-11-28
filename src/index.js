@@ -254,7 +254,7 @@ exports.handler = async (event, context, callback) => {
             callback(constants.INTERNAL_ERROR);
         }
 
-        logger.info('4. VERIFY REQUEST BODY FOR  FILTERS');
+        logger.info('4. VERIFY REQUEST BODY FOR FILTERS');
         let isEventValid = executor.verifyEvent();
         if (!isEventValid) {
             logger.error(constants.INVALID_REQUEST);
