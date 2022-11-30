@@ -126,7 +126,7 @@ Resources:
         - apiGatewayRootMethod
       Properties:
         RestApiId: !Ref apiExportGateway
-        StageName: LATEST
+        StageName: wfm-reports
 
   lambdaApiGatewayInvoke:
     Type: AWS::Lambda::Permission
@@ -256,6 +256,6 @@ Resources:
       Properties:
         Name: !Sub '/{{stack_prefix}}/aws/api-gateway/wfm-reports'
         Type: 'String'
-        Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com/LATEST
+        Value: !Sub https://${apiExportGateway}.execute-api.${AWS::Region}.amazonaws.com
         Description: !Sub 'WFM Data export - API domain (without hostname)'
 
