@@ -175,6 +175,23 @@ Resources:
                             Resource:
                                 - "*"
 
+  WFMSnowflakeDataExportAPIGatewayRole:
+     Type: AWS::IAM::Role
+     Properties:
+         RoleName: {{stack_prefix}}-WFM-SFDataExport
+         AssumeRolePolicyDocument:
+             Version: "2012-10-17"
+             Statement:
+                 -
+                     Effect: Allow
+                     Principal:
+                         Service:
+                             - apigateway.amazonaws.com
+                             - lambda.amazonaws.com
+                             - events.amazonaws.com
+                     Action:
+                         - sts:AssumeRole
+
   WFMSnowflakeExportDataFunction:
      Type: AWS::Lambda::Function
      DependsOn:

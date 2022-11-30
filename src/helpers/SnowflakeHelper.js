@@ -41,8 +41,13 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
         }
     });
 
-    connection.execute({
-        sqlText: 'USE WAREHOUSE REPORTS_WH;'
+    let sqlTextUseWarehouse = "USE WAREHOUSE REPORTS_WH;";
+
+    await executeSFQuery(connection, sqlTextUseWarehouse, paramObject).then((response) => {
+        responseRows = JSON.stringify(response);
+        logger.log("Tenant is : " + tenantSchemaName + ", Response from execute sql : " + JSON.stringify(response));
+    }).catch((error) => {
+        logger.log("Tenant is: " + tenantSchemaName + ", error in statement execution" + error);
     });
 
     sqlText = queryParams.part1 + tenantId + queryParams.part2 + schedulingUnitId + queryParams.part3 +
