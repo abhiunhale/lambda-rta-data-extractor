@@ -41,7 +41,7 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
         }
     });
 
-    let sqlTextUseWarehouse= "USE WAREHOUSE REPORTS_WH;";
+    let sqlTextUseWarehouse = "USE WAREHOUSE REPORTS_WH;";
 
     await executeSFQuery(connection, sqlTextUseWarehouse, paramObject).then((response) => {
         responseRows = JSON.stringify(response);
