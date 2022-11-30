@@ -45,7 +45,7 @@ async function fetchDataFromSnowflake(paramObject, snowflakeConnectionKeys) {
 
     await executeSFQuery(connection, sqlTextUseWarehouse, paramObject).then((response) => {
         responseRows = JSON.stringify(response);
-        logger.log("Tenant is: " + tenantSchemaName + ", Response from execute sql : " + JSON.stringify(response));
+        logger.log("Tenant is : " + tenantSchemaName + ", Response from execute sql : " + JSON.stringify(response));
     }).catch((error) => {
         logger.log("Tenant is: " + tenantSchemaName + ", error in statement execution" + error);
     });
